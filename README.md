@@ -12,6 +12,25 @@
 - **數據存儲**: Redis 時序數據儲存
 - **容器化部署**: Docker Compose 一鍵部署
 
+## 🖼️ 系統截圖
+
+以下是系統的主要界面截圖，展示了 Web 前端界面的完整功能：
+
+### 1. Web 前端 - 配置與連接控制界面
+![Web Frontend Configuration](screenshot/image1.png)
+*現代化的 Vue 3 界面，採用玻璃擬態 (Glass-morphism) 設計風格。包含完整的 Modbus 配置面板 (Host、Port、Device ID、Poll Interval、地址範圍) 和連接控制按鈕 (Update Config、Connect、Disconnect、Start/Stop Monitoring)，右上角顯示即時連接狀態*
+
+### 2. Web 前端 - 手動讀取界面
+![Web Frontend Manual Read](screenshot/image2.png)
+*手動讀取 (Manual Read) 功能區，可指定寄存器地址 (Address)、讀取數量 (Count) 和寄存器類型 (Register Type: Holding/Input/Coils/Discrete Inputs)。下方為寫入 Holding Register 區域，支援單一值或多值 (逗號分隔) 寫入。右側顯示讀取成功的通知訊息，展示讀回的數值*
+
+### 3. Web 前端 - 寫入測試與數據監控界面
+![Web Frontend Write and Monitor](screenshot/image3.png)
+*展示完整的寫入與監控流程。上方為 Write Holding Register 區域，包含單一寫入和多值寫入按鈕 (Write Single/Write Multiple)。下方 Modbus Data 表格即時顯示監控數據，包含寄存器名稱 (Name)、地址 (Address)、類型 (Type)、數值 (Values) 和時間戳 (Timestamp)。右側綠色通知顯示多次讀取成功的結果*
+
+### 4. API 文檔界面
+瀏覽器訪問 `http://localhost:8000/docs` 可查看完整的 Swagger UI 交互式 API 文檔，方便開發者快速測試所有端點 (連接、讀取、寫入、監控、數據查詢等)
+
 ## 📁 專案結構分析
 
 ### 核心文件概覽
