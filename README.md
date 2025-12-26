@@ -4,13 +4,14 @@ An asynchronous Modbus data monitoring system based on Python asyncio, providing
 
 ## 📋 Project Overview
 
-This project is a full-stack Modbus monitoring solution, including:
-- **Core Python Module**: Asynchronous Modbus client library
-- **CLI Tool**: Command-line monitoring and read/write utility
-- **REST API Backend**: FastAPI server providing an HTTP interface
-- **Web Frontend**: Modern Vue 3 user interface
-- **Data Storage**: Redis for time-series data storage
+This project is a comprehensive full-stack Modbus monitoring solution, including:
+- **Core Python Module**: Asynchronous Modbus client library with advanced features
+- **CLI Tool**: Command-line monitoring and read/write utility with multiple modes
+- **REST API Backend**: FastAPI server providing an HTTP interface for programmatic access
+- **Modern Web Frontend**: Vue 3 single-page application with glass-morphism design
+- **Data Storage**: Redis for time-series data persistence and caching
 - **Containerized Deployment**: One-click deployment with Docker Compose
+- **Multi-Interface Support**: Seamlessly switch between CLI, API, and Web interfaces
 
 ## 🖼️ System Screenshots
 
@@ -36,25 +37,29 @@ Visit `http://localhost:8000/docs` in your browser to see the complete Swagger U
 ### Core File Overview
 
 ```
-modbus_test/
-├── async_modbus_monitor.py    (377 lines) - Core Modbus monitoring module
-├── example_config.py           (492 lines) - CLI configuration example and interactive tool
-├── start_backend.py            (28 lines)  - Backend startup script
+modbus_monitor/
+├── async_modbus_monitor.py      (377 lines) - Core asynchronous Modbus client library
+├── example_config.py             (492 lines) - CLI tool with configuration and interactive modes
+├── start_backend.py             (28 lines)  - Backend service startup script
 ├── backend/
-│   ├── main.py                 (332 lines) - FastAPI REST API service
-│   └── modbus_service.py       (297 lines) - Modbus service with Redis integration
+│   ├── main.py                  (332 lines) - FastAPI REST API application
+│   └── modbus_service.py        (297 lines) - Modbus service with Redis integration
 ├── frontend/
-│   ├── index.html              (518 lines) - Vue 3 frontend interface
-│   ├── app.js                  - Frontend application logic
-│   └── css/styles.css          - Gradient glass-style UI
-├── docker-compose.yml          - Docker container orchestration
-├── Dockerfile.backend          - Backend container image
-├── pyproject.toml              - UV project configuration
-├── requirements.txt            - Python dependency packages
-├── .env.example                - Environment variable example
-├── CLAUDE.md                   - Development guidelines
-├── USAGE.md                    - Usage instructions
-└── REFACTOR_SUMMARY.md         - Refactoring log
+│   ├── index.html               (518 lines) - Vue 3 single-page application
+│   ├── app.js                   - Frontend application logic
+│   └── css/styles.css           - Modern glass-morphism UI styling
+├── docker-compose.yml           - Three-container orchestration (Redis + Backend + Frontend)
+├── Dockerfile.backend           - Backend container image definition
+├── pyproject.toml               - UV project configuration and dependencies
+├── requirements.txt             - Python dependency packages
+├── .env.example                 - Environment variable configuration template
+├── docs/
+│   ├── CLAUDE.md                - Development guidelines and coding standards
+│   ├── USAGE.md                 - Detailed usage instructions
+│   ├── UML.md                   - System architecture diagrams
+│   ├── GITHUB_KEY.md            - GitHub SSH key setup guide
+│   └── REFACTOR_SUMMARY.md      - Project refactoring documentation
+└── REFACTOR_SUMMARY.md         - Overall project refactoring summary
 ```
 
 **Total Code**: Approx. 1,522 lines of Python code
@@ -92,14 +97,14 @@ modbus_test/
                      │ HTTP/REST API
 ┌────────────────────▼────────────────────────────────────┐
 │              FastAPI Backend Service                     │
-│          (Async HTTP Server + WebSocket)                 │
+│          (Async HTTP Server + WebSocket Support)        │
 └────────────────────┬────────────────────────────────────┘
                      │
         ┌────────────┼────────────┐
         │                         │
 ┌───────▼────────┐     ┌─────────▼──────────┐
 │  Modbus Service│     │   Redis Database    │
-│  (TCP Client)  │     │  (Time-Series Data) │
+│  (Async TCP)    │     │  (Time-Series Data) │
 └───────┬────────┘     └────────────────────┘
         │
 ┌───────▼────────────────────────┐
@@ -107,6 +112,14 @@ modbus_test/
 │  (PLC, Sensors, Controllers)    │
 └────────────────────────────────┘
 ```
+
+### Key Architecture Features
+
+1. **Asynchronous Design**: Built on Python asyncio for high performance
+2. **Separation of Concerns**: Clean separation between frontend, backend, and data layers
+3. **Data Persistence**: Redis integration for caching and historical data
+4. **Modular Components**: Each component can be developed and deployed independently
+5. **Scalability**: Container-based architecture supports horizontal scaling
 
 ### Core Class Structure
 
@@ -179,14 +192,15 @@ Location: `backend/modbus_service.py:39-297` (297 lines)
 ## 🎯 Technical Features Analysis
 
 ### Asynchronous Architecture
-- **Event Loop**: Based on the `asyncio` event loop.
-- **Non-blocking I/O**: All network operations use `async/await`.
-- **Concurrency**: `asyncio.gather()` executes multiple tasks concurrently.
-- **Performance Advantage**: A single thread can handle hundreds of concurrent connections.
+- **Event Loop**: Built on Python `asyncio` for high concurrency
+- **Non-blocking I/O**: All network operations use `async/await` pattern
+- **Concurrency**: Multiple registers read simultaneously using `asyncio.gather()`
+- **Performance Advantage**: Single thread handles hundreds of concurrent connections
+- **Automatic Reconnection**: Built-in retry logic with configurable limits
 
-### Write Operations Support
+### Comprehensive Write Operations
 
-The system provides comprehensive write operations for Modbus holding registers:
+The system provides robust write operations for Modbus holding registers:
 
 | Operation | Function | Purpose |
 |---|---|---|
@@ -194,6 +208,7 @@ The system provides comprehensive write operations for Modbus holding registers:
 | Multiple Write | `write_holding_registers()` | Write multiple values to consecutive registers (Function Code 16) |
 | Write Verification | Read-back after write | Verify written values match expected values |
 | Hex/Decimal Support | Value parsing | Support for both hexadecimal (0x prefix) and decimal values |
+| Error Handling | Exception management | Graceful handling of communication errors
 
 #### Write Operation Implementation (`async_modbus_monitor.py:162-234`)
 ```python
@@ -310,7 +325,7 @@ data() {
 | Coils | FC01, FC05, FC15 | ✅ | ✅ | 1-bit | Digital output control |
 | Discrete Inputs | FC02 | ✅ | ❌ | 1-bit | Switch status, alarms |
 
-**Note**: Currently, write operations are fully implemented for Holding Registers. Coil write operations (FC05, FC15) are supported in the backend service but may require additional implementation in the frontend and CLI tools.
+**Note**: Write operations are fully implemented for Holding Registers (FC06, FC16). Coil write operations (FC05, FC15) are supported in the backend service and can be extended to frontend/CLI as needed.
 
 #### Read Operation Implementation (`async_modbus_monitor.py:87-146`)
 ```python
@@ -323,12 +338,6 @@ async def read_register(self, reg_config: RegisterConfig):
         )
     # ... other types implemented similarly
 ```
-
-#### Write Operation Implementation (`async_modbus_monitor.py:162-234`)
-- **Single Register Write**: `write_register()` - FC06
-- **Multiple Registers Write**: `write_registers()` - FC16
-- Supports hexadecimal and decimal input.
-- Read-back verification after writing.
 
 ### 2. Three Usage Modes
 
@@ -419,8 +428,16 @@ curl -X POST http://localhost:8000/api/write \
   -H "Content-Type: application/json" \
   -d '{"address": 10, "value": 1234}'
 
+# Write multiple registers
+curl -X POST http://localhost:8000/api/write_multiple \
+  -H "Content-Type: application/json" \
+  -d '{"address": 10, "values": [100, 200, 300]}'
+
 # Get latest data
 curl http://localhost:8000/api/data/latest
+
+# Get historical data (last 50 entries)
+curl "http://localhost:8000/api/data/history?limit=50"
 ```
 
 #### C. Web Interface Mode
@@ -553,7 +570,7 @@ import argparse      # Command-line argument parsing
 
 ### System Dependencies
 
-- **Python**: >= 3.10 (uses `match-case` and new type hints)
+- **Python**: >= 3.10 (uses `match-case` and modern type hints)
 - **Redis**: >= 7.0 (for time-series data storage)
 - **UV**: Python package manager (recommended, 10-100x faster than pip)
 - **Docker**: >= 20.10 (optional, for containerized deployment)
@@ -573,6 +590,13 @@ import argparse      # Command-line argument parsing
 
 ## 🔧 Installation and Setup
 
+### Prerequisites
+
+- **Python**: >= 3.10 (uses `match-case` and modern type hints)
+- **Redis**: >= 7.0 (for data storage)
+- **UV**: Python package manager (recommended, 10-100x faster than pip)
+- **Docker**: >= 20.10 (optional, for containerized deployment)
+
 ### Method 1: Using UV (Recommended)
 
 ```bash
@@ -581,7 +605,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Clone the project
 git clone <repository-url>
-cd modbus_test
+cd modbus_monitor
 
 # 3. Sync dependencies with UV
 uv sync
@@ -963,6 +987,23 @@ server {
         proxy_pass http://127.0.0.1:8000;
     }
 }
+```
+
+#### 8. Authentication and Authorization
+
+```python
+# Multi-factor authentication setup
+# - Implement OAuth2 for third-party integrations
+# - Set up role-based access control (RBAC)
+# - Use API keys for device-to-device communication
+# - Implement session management with proper timeout
+
+# Security headers
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    content_security_policy="default-src 'self'",
+    strict_transport_security="max-age=31536000; includeSubDomains",
+)
 ```
 
 ## 🔧 Troubleshooting
