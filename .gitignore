@@ -11,3 +11,6 @@ __pycache__/
 # Backups
 *.backup
 *.old
+
+# Terminal Paste Image folder
+.cp-images/

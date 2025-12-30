@@ -35,7 +35,7 @@ createApp({
         });
 
         const config = reactive({
-            host: '192.168.30.24',
+            host: '192.168.30.20',
             port: 502,
             device_id: 1,
             poll_interval: 2.0,

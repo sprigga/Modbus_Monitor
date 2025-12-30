@@ -15,11 +15,18 @@ import redis.asyncio as redis
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
+# Import the new configuration system
+from .config import SimpleModbusConfig, Settings, get_settings
 
+
+# Keep the original dataclass for backward compatibility but with configurable defaults
 @dataclass
 class ModbusConfig:
-    """Configuration for Modbus connection and monitoring"""
-    host: str
+    """
+    Configuration for Modbus connection and monitoring
+    DEPRECATED: Use SimpleModbusConfig or Settings.modbus instead
+    """
+    host: str = "192.168.30.24"
     port: int = 502
     device_id: int = 1
     poll_interval: float = 1.0

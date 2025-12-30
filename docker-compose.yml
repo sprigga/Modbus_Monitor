@@ -27,13 +27,18 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: nginx:alpine
+    build:
+      context: ./frontend-vite
+      dockerfile: Dockerfile
+    # 保留原來的 image 設定作為備註,若需要直接使用已建構的映像檔可啟用
+    # image: nginx:alpine
     container_name: modbus_frontend
     ports:
       - "8081:80"
-    volumes:
-      - ./frontend:/usr/share/nginx/html
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    # 原本使用 volumes 掛載已建構的 dist 目錄,現在改為在建構時複製
+    # volumes:
+    #   - ./frontend-vite/dist:/usr/share/nginx/html
+    #   - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend
     restart: unless-stopped

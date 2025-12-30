@@ -17,9 +17,11 @@ import os
 from dotenv import load_dotenv
 
 from backend.modbus_service import ModbusService, ModbusConfig
+from backend.config import get_settings, Settings
 
-# Load environment variables
+# Load environment variables and settings
 load_dotenv()
+settings = get_settings()
 
 app = FastAPI(title="Modbus Monitor API", version="1.0.0")
 
@@ -36,6 +38,13 @@ app.add_middleware(
 modbus_service: Optional[ModbusService] = None
 redis_client: Optional[redis.Redis] = None
 monitoring_task: Optional[asyncio.Task] = None
+# 原有的程式碼: 沒有存儲動態的 register 配置
+# 問題: start_monitoring 使用的是靜態的 settings.modbus.register_ranges
+# 解決方案: 添加全局變量存儲動態配置
+monitoring_config = {
+    "start_address": 1,
+    "end_address": 26
+}
 
 # Pydantic models
 class ModbusConfigModel(BaseModel):
@@ -64,27 +73,40 @@ class MultipleRegisterWriteRequest(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize Redis connection and Modbus service"""
-    global redis_client, modbus_service
-    
+    global redis_client, modbus_service, monitoring_config
+
     # Setup logging
     logging.basicConfig(level=logging.INFO)
-    
-    # Initialize Redis
-    redis_host = os.getenv("REDIS_HOST", "localhost")
-    redis_port = int(os.getenv("REDIS_PORT", 6379))
-    redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
-    
-    # Initialize Modbus service with config from environment
-    config = ModbusConfig(
-        host=os.getenv("MODBUS_HOST", "192.168.30.24"),
-        port=int(os.getenv("MODBUS_PORT", 502)),
-        device_id=int(os.getenv("MODBUS_DEVICE_ID", 1)),
-        poll_interval=float(os.getenv("MODBUS_POLL_INTERVAL", 2.0)),
-        timeout=float(os.getenv("MODBUS_TIMEOUT", 3.0)),
-        retries=int(os.getenv("MODBUS_RETRIES", 3))
+
+    # Initialize Redis using settings
+    redis_client = redis.Redis(
+        host=settings.redis.host,
+        port=settings.redis.port,
+        password=settings.redis.password,
+        db=settings.redis.db,
+        decode_responses=True
     )
-    
+
+    # Initialize Modbus service using settings
+    modbus_config = settings.modbus
+    config = ModbusConfig(
+        host=modbus_config.host,
+        port=modbus_config.port,
+        device_id=modbus_config.device_id,
+        poll_interval=modbus_config.poll_interval,
+        timeout=modbus_config.timeout,
+        retries=modbus_config.retries
+    )
+
     modbus_service = ModbusService(config, redis_client)
+
+    # 初始化 monitoring_config 從 settings.modbus.register_ranges
+    # 原有的程式碼: 沒有初始化 monitoring_config
+    # 解決方案: 從 settings 讀取初始值到 monitoring_config
+    if modbus_config.register_ranges:
+        first_range = modbus_config.register_ranges[0]
+        monitoring_config["start_address"] = first_range.start_address
+        monitoring_config["end_address"] = first_range.start_address + first_range.count - 1
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -107,9 +129,17 @@ async def shutdown_event():
 @app.get("/api/config")
 async def get_config():
     """Get current Modbus configuration"""
+    global monitoring_config
+
     if not modbus_service:
         raise HTTPException(status_code=500, detail="Modbus service not initialized")
-    
+
+    # 原有的程式碼: 從 settings.modbus.register_ranges 讀取
+    # 問題: 這是靜態配置,不反映用戶通過 API 更新的值
+    # 解決方案: 從全局變量 monitoring_config 讀取動態配置
+    start_address = monitoring_config["start_address"]
+    end_address = monitoring_config["end_address"]
+
     return {
         "host": modbus_service.config.host,
         "port": modbus_service.config.port,
@@ -117,15 +147,15 @@ async def get_config():
         "poll_interval": modbus_service.config.poll_interval,
         "timeout": modbus_service.config.timeout,
         "retries": modbus_service.config.retries,
-        "start_address": int(os.getenv("START_ADDRESS", 1)),
-        "end_address": int(os.getenv("END_ADDRESS", 26))
+        "start_address": start_address,
+        "end_address": end_address
     }
 
 @app.post("/api/config")
 async def update_config(config: ModbusConfigModel):
     """Update Modbus configuration"""
-    global modbus_service, monitoring_task
-    
+    global modbus_service, monitoring_task, monitoring_config
+
     # Stop current monitoring if running
     if monitoring_task and not monitoring_task.done():
         monitoring_task.cancel()
@@ -133,27 +163,32 @@ async def update_config(config: ModbusConfigModel):
             await monitoring_task
         except asyncio.CancelledError:
             pass
-    
+
     # Disconnect current service
     if modbus_service:
         await modbus_service.disconnect()
-    
-    # Store start/end address in environment variables (or use a global config store)
-    os.environ["START_ADDRESS"] = str(config.start_address)
-    os.environ["END_ADDRESS"] = str(config.end_address)
-    
-    # Create new service with updated config
-    new_config = ModbusConfig(
-        host=config.host,
-        port=config.port,
-        device_id=config.device_id,
-        poll_interval=config.poll_interval,
-        timeout=config.timeout,
-        retries=config.retries
-    )
-    
+
+    # Create new Modbus config from request
+    new_modbus_config = {
+        "host": config.host,
+        "port": config.port,
+        "device_id": config.device_id,
+        "poll_interval": config.poll_interval,
+        "timeout": config.timeout,
+        "retries": config.retries
+    }
+
+    # Create new config object
+    new_config = ModbusConfig(**new_modbus_config)
+
     modbus_service = ModbusService(new_config, redis_client)
-    
+
+    # 原有的程式碼: 沒有保存 start_address 和 end_address
+    # 問題: start_monitoring 使用靜態配置,導致配置更新無效
+    # 解決方案: 保存到全局變量 monitoring_config
+    monitoring_config["start_address"] = config.start_address
+    monitoring_config["end_address"] = config.end_address
+
     return {"message": "Configuration updated successfully"}
 
 @app.post("/api/connect")
@@ -253,27 +288,40 @@ async def write_multiple_registers(request: MultipleRegisterWriteRequest):
 @app.post("/api/start_monitoring")
 async def start_monitoring():
     """Start continuous monitoring"""
-    global monitoring_task
-    
+    global monitoring_task, monitoring_config
+
     if not modbus_service:
         raise HTTPException(status_code=500, detail="Modbus service not initialized")
-    
+
     if not modbus_service.is_connected():
         raise HTTPException(status_code=400, detail="Not connected to Modbus device")
-    
+
     if monitoring_task and not monitoring_task.done():
         raise HTTPException(status_code=400, detail="Monitoring already running")
-    
-    # Setup registers to monitor from environment
-    start_addr = int(os.getenv("START_ADDRESS", 1))
-    end_addr = int(os.getenv("END_ADDRESS", 26))
-    count = end_addr - start_addr + 1
-    
-    modbus_service.add_register(start_addr, count, "holding", f"Holding_{start_addr}-{end_addr}")
-    
+
+    # 原有的程式碼: 從 settings.modbus.register_ranges 讀取配置
+    # 問題: 這是靜態配置,不會隨 POST /apiconfig 更新
+    # 解決方案: 使用全局變量 monitoring_config 中的動態配置
+
+    # Clear existing registers
+    modbus_service.registers_to_monitor.clear()
+
+    # 從動態配置添加 register 範圍
+    start_address = monitoring_config["start_address"]
+    end_address = monitoring_config["end_address"]
+    count = end_address - start_address + 1
+
+    # 添加要監控的 register
+    modbus_service.add_register(
+        start_address,
+        count,
+        "holding",
+        f"holding_{start_address}"
+    )
+
     # Start monitoring task
     monitoring_task = asyncio.create_task(modbus_service.start_monitoring())
-    
+
     return {"message": "Monitoring started"}
 
 @app.post("/api/stop_monitoring")

@@ -1,0 +1,296 @@
+/* ======= 頁面專屬樣式（基於 styles.css 設計系統）======= */
+
+/* Container */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* 狀態指示燈 */
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+.status-connected {
+    background-color: #28a745;
+    box-shadow: 0 0 12px #28a745;
+    animation: pulse-glow 2s infinite;
+}
+.status-disconnected {
+    background-color: #dc3545;
+}
+.status-monitoring {
+    background-color: #ffc107;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px #28a745; }
+    50% { box-shadow: 0 0 16px #28a745; }
+}
+
+/* 導航欄 */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding: 20px 32px;
+}
+.navbar-brand {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.navbar-status {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* Section 間距 */
+.section {
+    margin-bottom: 32px;
+}
+
+/* Section Title */
+.section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 表單布局 */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+/* 調整 input-field 樣式與 styles.css 一致 */
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: var(--transition);
+    box-sizing: border-box;
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 12px var(--glow-color);
+    background: rgba(255, 255, 255, 0.8);
+}
+
+/* 按鈕組 */
+.btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* 兩欄布局 */
+.two-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+/* 子卡片標題 */
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 表格樣式 */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+.data-table th {
+    text-align: left;
+    padding: 12px 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+}
+.data-table td {
+    padding: 12px 16px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+.data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+.data-value {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+.timestamp {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+/* 空狀態 */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+.empty-state i {
+    font-size: 3.5rem;
+    opacity: 0.4;
+    margin-bottom: 20px;
+    display: block;
+}
+.empty-state p {
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* 頂部動作按鈕 */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.btn-small {
+    padding: 8px 18px;
+    font-size: 0.9rem;
+    border-radius: 20px;
+    margin-left: 8px;
+}
+
+/* Alert 通知 */
+.alert-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 1000;
+    max-width: 400px;
+}
+.alert {
+    background: var(--background-glass);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideInRight 0.4s ease;
+    position: relative;
+}
+.alert::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 12px 0 0 12px;
+}
+.alert-success::before { background: #28a745; }
+.alert-danger::before { background: #dc3545; }
+.alert-warning::before { background: #ffc107; }
+.alert-info::before { background: #17a2b8; }
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(450px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.btn-close {
+    background: transparent;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    margin-left: 16px;
+    padding: 0;
+    line-height: 1;
+    transition: var(--transition);
+}
+.btn-close:hover {
+    color: var(--text-primary);
+    transform: scale(1.1);
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .two-columns {
+        grid-template-columns: 1fr;
+    }
+    .btn-group {
+        flex-direction: column;
+    }
+    .btn-group .btn {
+        width: 100%;
+    }
+    .card-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+}
