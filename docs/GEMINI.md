@@ -18,10 +18,10 @@ It is recommended to use a Python virtual environment for dependency management.
 
 ## Basic Usage
 
-To use the monitor, you can import `AsyncModbusMonitor` and `ModbusConfig` from `async_modbus_monitor.py` and set up your configuration:
+To use the monitor, you can import `AsyncModbusMonitor` and `ModbusConfig` from `scripts/async_modbus_monitor.py` and set up your configuration:
 
 ```python
-from async_modbus_monitor import AsyncModbusMonitor, ModbusConfig
+from scripts.async_modbus_monitor import AsyncModbusMonitor, ModbusConfig
 import asyncio
 
 async def main():

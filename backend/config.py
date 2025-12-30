@@ -95,7 +95,9 @@ class ModbusConfig(BaseModel):
 class APIConfig(BaseModel):
     """API server configuration"""
     host: str = "0.0.0.0"
-    port: int = 8000
+    # 原有的端口: 8000
+    # 修改為5位數冷門端口: 18000
+    port: int = 18000
     debug: bool = False
     cors_origins: List[str] = ["*"]
 
@@ -218,7 +220,9 @@ class Settings(BaseSettings):
 
         # 從環境變數讀取配置
         host = os.getenv('API_HOST', '0.0.0.0')
-        port = int(os.getenv('API_PORT', '8000'))
+        # 原有的端口: 8000
+        # 修改為5位數冷門端口: 18000
+        port = int(os.getenv('API_PORT', '18000'))
         debug = os.getenv('API_DEBUG', 'False').lower() == 'true'
         cors_origins_str = os.getenv('API_CORS_ORIGINS', '*')
         cors_origins = [origin.strip() for origin in cors_origins_str.split(',')]

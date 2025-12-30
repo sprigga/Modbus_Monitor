@@ -16,8 +16,8 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 
-from backend.modbus_service import ModbusService, ModbusConfig
-from backend.config import get_settings, Settings
+from modbus_service import ModbusService, ModbusConfig
+from config import get_settings, Settings
 
 # Load environment variables and settings
 load_dotenv()

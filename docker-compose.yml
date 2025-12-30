@@ -3,7 +3,9 @@ services:
     image: redis:7-alpine
     container_name: modbus_redis
     ports:
-      - "6380:6379"
+      # 原有的端口: 6380:6379
+      # 修改為5位數冷門端口: 16380:6379
+      - "16380:6379"
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
@@ -11,11 +13,13 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: modbus_backend
     ports:
-      - "8000:8000"
+      # 原有的端口: 8000:8000
+      # 修改為5位數冷門端口: 18000:18000
+      - "18000:18000"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -34,7 +38,9 @@ services:
     # image: nginx:alpine
     container_name: modbus_frontend
     ports:
-      - "8081:80"
+      # 原有的端口: 8081:80
+      # 修改為5位數冷門端口: 18081:80
+      - "18081:80"
     # 原本使用 volumes 掛載已建構的 dist 目錄,現在改為在建構時複製
     # volumes:
     #   - ./frontend-vite/dist:/usr/share/nginx/html
@@ -45,4 +51,3 @@ services:
 
 volumes:
   redis_data:
-

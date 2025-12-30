@@ -8,19 +8,22 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY backend/ ./backend/
-COPY .env ./.env
+COPY . .
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8000
+# 原有的端口: 8000
+# 修改為5位數冷門端口: 18000
+EXPOSE 18000
 
 # Start the application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 原有的端口: 8000
+# 修改為5位數冷門端口: 18000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "18000"]

@@ -5,10 +5,14 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   server: {
-    port: 5173,
+    // 原有的端口: 5173
+    // 修改為5位數冷門端口: 15173
+    port: 15173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        // 原有的端口: 8000
+        // 修改為5位數冷門端口: 18000
+        target: 'http://localhost:18000',
         changeOrigin: true
       }
     }

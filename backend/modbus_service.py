@@ -16,7 +16,7 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 # Import the new configuration system
-from .config import SimpleModbusConfig, Settings, get_settings
+from config import SimpleModbusConfig, Settings, get_settings
 
 
 # Keep the original dataclass for backward compatibility but with configurable defaults
