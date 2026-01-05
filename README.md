@@ -894,9 +894,888 @@ The Modbus Monitor is a production-ready, full-stack solution for industrial Mod
 
 ---
 
-**Last Updated**: 2025-12-30  
-**Project Version**: 0.1.0  
-**Python Version**: >= 3.10  
+## 📊 System Architecture Analysis
+
+### Overall Architecture
+
+The Modbus Monitor system implements a three-tier architecture with clear separation of concerns:
+
+1. **Frontend Tier**: Vue 3 web application with modern UI components
+2. **Backend Tier**: FastAPI REST API with async Modbus service
+3. **Data Tier**: Redis for caching and time-series storage
+
+### Communication Flow
+
+```plantuml
+@startuml SystemCommunicationFlow
+!theme plain
+skinparam sequence {
+    ArrowColor #0066cc
+    LifeLineBorderColor #333333
+    ParticipantBorderColor #333333
+    ActorBorderColor #333333
+}
+
+title Modbus Monitor - System Communication Flow
+
+actor "User" as User
+participant "Frontend\n(Vue 3 + Vite)" as Frontend
+participant "Backend API\n(FastAPI)" as Backend
+participant "Modbus Service" as ModbusService
+participant "Redis" as Redis
+participant "Modbus Device" as Device
+
+User -> Frontend : Configure Connection
+Frontend -> Backend : POST /api/config
+Backend -> Backend : Update Configuration
+Frontend -> Backend : POST /api/connect
+Backend -> ModbusService : Establish Connection
+ModbusService -> Device : TCP Connection
+Device --> ModbusService : Connection Status
+ModbusService --> Backend : Status Update
+Backend --> Frontend : API Response
+Frontend --> User : Connection Status
+
+Frontend -> Backend : POST /api/start_monitoring
+Backend -> ModbusService : Start Monitoring Loop
+ModbusService -> Device : Read Registers
+Device --> ModbusService : Register Data
+ModbusService -> Redis : Store Data (latest)
+ModbusService -> Redis : Store Data (history)
+ModbusService --> Backend : Data Update
+Backend -> Frontend : Data Update
+Frontend -> User : Real-time Display
+
+Frontend -> Backend : POST /api/read
+Backend -> ModbusService : Read Command
+ModbusService -> Device : Read Request
+Device --> ModbusService : Register Values
+ModbusService --> Backend : Response Data
+Backend --> Frontend : JSON Data
+Frontend -> User : Display Results
+
+Frontend -> Backend : POST /api/write
+Backend -> ModbusService : Write Command
+ModbusService -> Device : Write Request
+Device --> ModbusService : Write Ack
+ModbusService --> Backend : Success/Fail
+Backend --> Frontend : Operation Result
+Frontend -> User : Feedback
+
+@enduml
+```
+
+### Data Flow Architecture
+
+```plantuml
+@startuml DataFlowArchitecture
+!theme plain
+skinparam component {
+    BorderColor #333333
+    BackgroundColor #f8f9fa
+    ArrowColor #0066cc
+}
+
+title Modbus Monitor - Data Flow Architecture
+
+package "Frontend Layer" {
+    component [Vue 3 App] as VueApp
+    component [API Client] as API
+    component [UI Components] as UI
+}
+
+package "Backend Layer" {
+    component [FastAPI Server] as FastAPI
+    component [Modbus Service] as Modbus
+    component [Redis Client] as Redis
+}
+
+package "Data Layer" {
+    component [Latest Data Cache] as LatestCache
+    component [Historical Data] as History
+}
+
+package "Device Layer" {
+    component [Modbus TCP Client] as TCPClient
+    component [Register Manager] as RegisterManager
+    component [Error Handler] as ErrorHandler
+}
+
+' Frontend relationships
+VueApp --> API : HTTP/REST
+API --> FastAPI : API Calls
+UI --> VueApp : User Events
+API --> UI : Data Updates
+
+' Backend relationships
+FastAPI --> Modbus : Service Calls
+Modbus --> TCPClient : Async Operations
+TCPClient --> RegisterManager : Register Operations
+RegisterManager --> ErrorHandler : Error Handling
+
+' Data relationships
+Modbus --> Redis : Data Storage
+Redis --> LatestCache : Latest Values
+Redis --> History : Time-Series Data
+LatestCache --> FastAPI : Data Retrieval
+History --> FastAPI : Data Retrieval
+
+' Device relationships
+TCPClient --> ModbusDevice : TCP Connection
+ModbusDevice --> RegisterManager : Data Exchange
+
+note right of VueApp
+    Frontend Components:
+    - Configuration.vue
+    - ManualRead.vue
+    - WriteRegister.vue
+    - DataDisplay.vue
+end note
+
+note right of FastAPI
+    API Endpoints:
+    - Configuration Management
+    - Connection Control
+    - Read/Write Operations
+    - Monitoring Control
+    - Data Retrieval
+end note
+
+note right of Redis
+    Data Storage:
+    - modbus:latest (JSON)
+    - modbus:history (Sorted Set)
+    - Configurable retention
+end note
+
+note right of ModbusDevice
+    Device Support:
+    - Holding Registers (FC03, FC06, FC16)
+    - Input Registers (FC04)
+    - Coils (FC01, FC05, FC15)
+    - Discrete Inputs (FC02)
+end note
+
+@enduml
+```
+
+### Sequence Diagram for Read Operation
+
+```plantuml
+@startuml ReadOperationSequence
+!theme plain
+skinparam sequence {
+    ArrowColor #0066cc
+    LifeLineBorderColor #333333
+    ParticipantBorderColor #333333
+    ActorBorderColor #333333
+    ActivateBorderColor #00cc66
+    DeactivateBorderColor #cc0000
+}
+
+title Modbus Monitor - Read Operation Sequence
+
+actor "User" as User
+participant "Frontend" as Frontend
+participant "FastAPI" as Backend
+participant "ModbusService" as Service
+participant "ModbusClient" as Client
+participant "Redis" as Redis
+participant "Device" as Device
+
+== Initial Request ==
+User -> Frontend : Click "Read Register"
+Frontend -> Frontend : Validate Input
+Frontend -> Backend : POST /api/read
+note right of Frontend
+    Request Payload:
+    {
+        "address": 0,
+        "count": 10,
+        "register_type": "holding"
+    }
+end note
+
+Backend -> Backend : Validate Request
+Backend -> Service : read_holding_registers()
+activate Service
+
+Service -> Client : read_holding_registers()
+activate Client
+
+Client -> Device : Send Modbus Request
+Device --> Client : Return Register Values
+
+Client --> Service : Data Received
+deactivate Client
+
+Service -> Service : Process Data
+Service -> Redis : Store in cache (latest)
+Service -> Redis : Add to history
+Service --> Backend : Return Processed Data
+deactivate Service
+
+Backend -> Frontend : Return JSON Data
+note right of Backend
+    Response:
+    {
+        "success": true,
+        "data": [...],
+        "timestamp": "..."
+    }
+end note
+
+Frontend -> Frontend : Update Display
+Frontend --> User : Show Register Values
+Frontend -> Frontend : Auto-refresh enabled?
+
+== Monitoring Loop ==
+Frontend -> Backend : Poll /api/data/latest
+Backend -> Redis : Get latest data
+Redis --> Backend : Return cached data
+Backend --> Frontend : Return JSON
+Frontend -> Frontend : Update UI in real-time
+
+@enduml
+```
+
+### Class Diagram for Modbus Service
+
+```plantuml
+@startuml ModbusServiceClassDiagram
+!theme plain
+skinparam class {
+    BorderColor #333333
+    BackgroundColor #f8f9fa
+    ArrowColor #0066cc
+    StereotypeColor #666666
+}
+
+title Modbus Monitor - Modbus Service Class Diagram
+
+class ModbusConfig {
+    + host: str
+    + port: int
+    + device_id: int
+    + poll_interval: float
+    + timeout: float
+    + retries: int
+    --
+    + validate_connection() -> bool
+    + get_default_timeout() -> float
+}
+
+class AsyncModbusMonitor {
+    - client: ModbusTcpClient
+    - config: ModbusConfig
+    - running: bool
+    - registers: List[Dict]
+    - consecutive_errors: int
+    --
+    + connect() -> bool
+    + disconnect() -> None
+    + read_holding_registers() -> List[int]
+    + write_holding_register() -> bool
+    + monitor_continuously() -> None
+    + add_register() -> None
+    - _handle_error() -> None
+    - _reconnect() -> bool
+}
+
+class RegisterDefinition {
+    + address: int
+    + count: int
+    + register_type: str
+    + name: str
+    + unit: str = ""
+    + scale: float = 1.0
+    --
+    + validate() -> bool
+    + get_function_code() -> int
+}
+
+class ModbusData {
+    + timestamp: datetime
+    + register_name: str
+    + address: int
+    + values: List[int]
+    + register_type: str
+    + success: bool
+    + error: str = ""
+    --
+    + to_dict() -> Dict
+    + to_redis_format() -> str
+}
+
+class RedisManager {
+    - host: str
+    - port: int
+    - db: int
+    - redis_client: Redis
+    --
+    + connect() -> bool
+    + store_latest(data: ModbusData) -> bool
+    + store_history(data: ModbusData) -> bool
+    + get_latest() -> Dict
+    + get_history(limit: int) -> List[Dict]
+    + close() -> None
+}
+
+' Relationships
+ModbusConfig "1" *-- "1" AsyncModbusMonitor : uses
+AsyncModbusMonitor "1" *-- "*" RegisterDefinition : manages
+AsyncModbusMonitor "1" --> "1" RedisManager : uses
+ModbusData "1" --> "1" RegisterDefinition : based on
+RedisManager "1" --> "*" ModbusData : stores
+
+' Notes
+note right of AsyncModbusMonitor
+    Key Methods:
+    - Async operations using asyncio
+    - Automatic reconnection
+    - Error handling with retries
+    - Concurrent register reading
+end note
+
+note right of RegisterDefinition
+    Register Types:
+    - holding (FC03, FC06, FC16)
+    - input (FC04)
+    - coils (FC01, FC05, FC15)
+    - discrete (FC02)
+end note
+
+note right of RedisManager
+    Redis Keys:
+    - modbus:latest (JSON)
+    - modbus:history (Sorted Set)
+end note
+
+@enduml
+```
+
+### State Diagram for Connection Management
+
+```plantuml
+@startuml ConnectionStateDiagram
+!theme plain
+skinparam state {
+    BorderColor #333333
+    BackgroundColor #f8f9fa
+    ArrowColor #0066cc
+    StartColor #00cc66
+    EndColor #cc0000
+    StateBackgroundColor #ffffff
+}
+
+title Modbus Monitor - Connection State Management
+
+[*] --> Disconnected
+
+state Disconnected {
+    [*] --> Connecting
+    Connecting --> Connected : Success
+    Connecting --> Disconnected : Failed/Timeout
+    Connecting --> Error : Connection Error
+
+    state "No Connection" as DisconnectedState
+    DisconnectedState --> Connecting : Connect Request
+}
+
+state Connected {
+    Connected --> Monitoring : Start Monitoring
+    Connected --> ManualRead : Read Request
+    Connected --> ManualWrite : Write Request
+    Connected --> Disconnecting : Disconnect Request
+
+    state "Idle" as IdleState
+    state "Active" as ActiveState
+    IdleState --> ActiveState : Activity
+    ActiveState --> IdleState : Inactivity
+}
+
+state Monitoring {
+    Monitoring --> Monitoring : Poll Cycle
+    Monitoring --> ManualRead : Read Request
+    Monitoring --> ManualWrite : Write Request
+    Monitoring --> Stopping : Stop Request
+    Monitoring --> Disconnected : Error/Lost Connection
+
+    state "Polling" as PollingState
+    PollingState --> PollingState : Successful Read
+    PollingState --> Monitoring : Continue
+}
+
+state Error {
+    Error --> Error : Handle Error
+    Error --> Connecting : Retry
+    Error --> Disconnected : Max Retries Exceeded
+}
+
+state Connecting
+state Disconnecting {
+    Disconnecting --> Disconnected : Complete
+    Disconnecting --> Error : Error During Disconnect
+}
+
+state ManualRead
+state ManualWrite
+state Stopping
+
+' Transitions
+Disconnected --> Connecting : connect()
+Connecting --> Connected : Connection Success
+Connecting --> Error : Connection Failed
+Connecting --> Disconnected : Cancel Request
+
+Connected --> Monitoring : start_monitoring()
+Connected --> ManualRead : read_registers()
+Connected --> ManualWrite : write_register()
+Connected --> Disconnecting : disconnect()
+
+Monitoring --> ManualRead : Interrupt for read
+Monitoring --> ManualWrite : Interrupt for write
+Monitoring --> Stopping : stop_monitoring()
+
+ManualRead --> Connected : Complete
+ManualWrite --> Connected : Complete
+
+Stopping --> Connected : Monitor Restarted
+Stopping --> Disconnected : Fully Stopped
+
+Error --> Connecting : Retry after delay
+Error --> Disconnected : Give up
+
+note right of Monitoring
+    Monitoring State:
+    - Continuous polling
+    - Data storage in Redis
+    - Error recovery
+    - Configuration updates supported
+end note
+
+note right of Error
+    Error Handling:
+    - Configurable retry count
+    - Exponential backoff
+    - Graceful degradation
+    - User notification
+end note
+
+@enduml
+```
+
+## 🏗️ Detailed Architecture Analysis
+
+### 1. System Architecture Pattern
+
+The project follows a **Three-Tier Architecture** pattern:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Presentation Layer                       │
+│              Vue 3 + Vite Frontend                       │
+│    - Configuration Interface                           │
+│    - Real-time Data Display                             │
+│    - User Interaction Management                        │
+└────────────────────┬────────────────────────────────────┘
+                     │ HTTP/REST API (JSON)
+┌────────────────────▼────────────────────────────────────┐
+│                Business Logic Layer                       │
+│               FastAPI Backend Service                   │
+│    - API Endpoints Management                           │
+│    - Request Validation                                  │
+│    - Authentication & Authorization                    │
+│    - Business Logic Processing                          │
+└────────────────────┬────────────────────────────────────┘
+                     │ Internal Service Calls
+┌────────────────────▼────────────────────────────────────┐
+│                Data Access Layer                         │
+│             Modbus Service + Redis                       │
+│    - Modbus TCP Communication                           │
+│    - Data Persistence (Time-series)                      │
+│    - Caching Strategy                                    │
+│    - Error Handling & Recovery                          │
+└────────────────────┬────────────────────────────────────┘
+                     │ TCP/IP Protocol
+┌────────────────────▼────────────────────────────────────┐
+│                External Systems                          │
+│            Modbus TCP Devices                           │
+│    - PLCs                                                │
+│    - Sensors                                             │
+│    - Industrial Controllers                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2. Technical Specifications
+
+#### Communication Protocol Stack
+
+| Layer | Protocol | Format | Port | Description |
+|-------|----------|--------|------|-------------|
+| **Application** | HTTP/REST | JSON | 18000 | API communication |
+| **Service** | TCP/IP | Binary | 502 | Modbus TCP protocol |
+| **Transport** | TCP | Stream | Various | Reliable delivery |
+| **Network** | IP | Packets | Various | Network routing |
+
+#### Data Formats
+
+**Request Format:**
+```json
+{
+    "address": 0,
+    "count": 10,
+    "register_type": "holding",
+    "value": 1234,
+    "values": [100, 200, 300]
+}
+```
+
+**Response Format:**
+```json
+{
+    "success": true,
+    "data": [
+        {
+            "register_name": "Temperature",
+            "address": 0,
+            "type": "holding",
+            "values": [250],
+            "timestamp": "2025-01-01T12:00:00Z"
+        }
+    ],
+    "error": null
+}
+```
+
+#### Modbus Function Codes Support
+
+| Operation | Function Code | Description | Support |
+|-----------|---------------|-------------|---------|
+| Read Holding Registers | 03 | Read 16-bit registers | ✅ |
+| Write Single Register | 06 | Write one register | ✅ |
+| Write Multiple Registers | 16 | Write multiple registers | ✅ |
+| Read Input Registers | 04 | Read analog inputs | ✅ |
+| Read Coils | 01 | Read digital outputs | ✅ |
+| Write Single Coil | 05 | Write one coil | ✅ |
+| Write Multiple Coils | 15 | Write multiple coils | ✅ |
+| Read Discrete Inputs | 02 | Read digital inputs | ✅ |
+
+### 3. Workflow Analysis
+
+#### Configuration Workflow
+
+```plantuml
+@startuml ConfigurationWorkflow
+!theme plain
+skinparam activity {
+    BorderColor #333333
+    BackgroundColor #f8f9fa
+    ArrowColor #0066cc
+    StartColor #00cc66
+    EndColor #cc0000
+}
+
+title Modbus Monitor - Configuration Workflow
+
+start
+
+:User opens Configuration Panel;
+if (Configuration exists?) then (yes)
+    :Display current config;
+    :User modifies parameters;
+else (no)
+    :Load default values;
+    :User enters parameters;
+endif
+
+:Validate input parameters;
+if (Valid?) then (yes)
+    :Update Configuration object;
+    :Save to environment variables;
+    :Send POST /api/config;
+    :Backend updates Pydantic config;
+    :Store in Redis cache;
+else (no)
+    :Show validation errors;
+    :Highlight invalid fields;
+    :Retry configuration;
+endif
+
+:Update UI with new config;
+:Show success message;
+
+stop
+
+note right of User opens Configuration Panel
+    Configuration Options:
+    - Modbus Host (IP)
+    - Modbus Port
+    - Device ID
+    - Poll Interval
+    - Timeout Settings
+    - Register Ranges
+end note
+
+@enduml
+```
+
+#### Monitoring Workflow
+
+```plantuml
+@startuml MonitoringWorkflow
+!theme plain
+skinparam activity {
+    BorderColor #333333
+    BackgroundColor #f8f9fa
+    ArrowColor #0066cc
+    StartColor #00cc66
+    EndColor #cc0000
+}
+
+title Modbus Monitor - Monitoring Workflow
+
+:start_monitoring
+
+:Initialize monitoring loop;
+:Set up register list;
+:Start asyncio tasks;
+
+repeat
+    :Check connection status;
+    if (Connected?) then (yes)
+        :Read all configured registers;
+        if (Success?) then (yes)
+            :Process register data;
+            :Apply scaling/conversion;
+            :Store in Redis (latest);
+            :Add to Redis history;
+            :Update UI via API;
+            :Wait for poll interval;
+        else (no)
+            :Handle error;
+            :Increment error counter;
+            if (Max errors?) then (yes)
+                :Attempt reconnection;
+            else (no)
+                :Continue monitoring;
+            endif
+        endif
+    else (no)
+        :Attempt connection;
+        if (Success?) then (yes)
+            :Reset error counter;
+        else (no)
+            :Wait before retry;
+        endif
+    endif
+repeat while (Monitoring active)
+
+:Stop monitoring loop;
+:Close connections;
+:Clean up resources;
+
+:end_monitoring
+
+note right of Read all configured registers
+    Read Operations:
+    - Concurrent reading with asyncio.gather()
+    - Batch requests for efficiency
+    - Error handling per register
+    - Timeout management
+end note
+
+note right of Store in Redis
+    Data Storage:
+    - Latest: JSON format for immediate access
+    - History: Sorted set with timestamp
+    - Configurable retention policy
+    - Fast retrieval for UI updates
+end note
+
+@enduml
+```
+
+#### Error Recovery Workflow
+
+```plantuml
+@startuml ErrorRecoveryWorkflow
+!theme plain
+skinparam activity {
+    BorderColor #333333
+    BackgroundColor #f8f9fa
+    ArrowColor #0066cc
+    StartColor #00cc66
+    EndColor #cc0000
+}
+
+title Modbus Monitor - Error Recovery Workflow
+
+:Error Occurred;
+
+:Determine error type;
+if (Connection Error?) then (yes)
+    :Close connection;
+    :Increment consecutive errors;
+    if (Max errors reached?) then (yes)
+        :Log critical error;
+        :Notify user;
+        :Stop monitoring;
+        :Exit recovery;
+    else (no)
+        :Wait exponential backoff;
+        :Attempt reconnection;
+        if (Success?) then (yes)
+            :Reset error counter;
+            :Continue monitoring;
+        else (no)
+            :Retry connection;
+        endif
+    endif
+else if (Read Error?) then (yes)
+    :Log read error;
+    :Mark registers as failed;
+    :Continue with other registers;
+    :Update UI with error status;
+else if (Write Error?) then (yes)
+    :Log write error;
+    :Notify user of failure;
+    :Update UI with error message;
+    :Continue normal operation;
+endif
+
+:Error recovery complete;
+
+note right of Determine error type
+    Error Types:
+    - Connection Timeout
+    - Network Unreachable
+    - Modbus Exception
+    - Device Busy
+    - Invalid Response
+    - Redis Connection
+end note
+
+note right of Exponential backoff
+    Backoff Strategy:
+    - Initial: 1 second
+    - Multiplier: 2x
+    - Maximum: 30 seconds
+    - Jitter: Random ±10%
+end note
+
+@enduml
+```
+
+### 4. Industry Applications and Use Cases
+
+#### Industrial Automation
+- **PLC Monitoring**: Real-time monitoring of Programmable Logic Controllers
+- **Sensor Data Collection**: Temperature, pressure, flow rate sensors
+- **Process Control**: Automated control systems with feedback loops
+- **Predictive Maintenance**: Monitor equipment health metrics
+
+#### Building Management
+- **HVAC Systems**: Climate control and energy monitoring
+- **Lighting Control**: Automated lighting systems
+- **Energy Management**: Power consumption monitoring
+- **Security Systems**: Access control and alarm monitoring
+
+#### Manufacturing
+- **Production Lines**: Machine status and output monitoring
+- **Quality Control**: Process parameter tracking
+- **Inventory Management**: Material level monitoring
+- **Equipment Monitoring**: Machine health and performance
+
+#### Agricultural
+- **Greenhouse Control**: Temperature, humidity, CO2 monitoring
+- **Irrigation Systems**: Soil moisture and flow control
+- **Livestock Monitoring**: Environmental conditions tracking
+
+### 5. Technical Challenges and Solutions
+
+#### Challenge 1: Real-time Performance
+**Problem**: Industrial applications require sub-second response times
+**Solution**:
+- Async/await architecture for non-blocking I/O
+- Concurrent register reading with `asyncio.gather()`
+- Redis caching for fast data retrieval
+- Optimized polling intervals
+
+#### Challenge 2: Reliability
+**Problem**: Industrial environments have unstable networks
+**Solution**:
+- Automatic reconnection with exponential backoff
+- Configurable retry mechanisms
+- Graceful error handling
+- Data validation and verification
+
+#### Challenge 3: Scalability
+**Problem**: Multiple devices and high data volumes
+**Solution**:
+- Asynchronous design handles concurrent connections
+- Redis for high-performance data storage
+- Configurable data retention policies
+- Load balancing ready architecture
+
+#### Challenge 4: Security
+**Problem**: Industrial systems are critical infrastructure
+**Solution**:
+- Network isolation recommendations
+- CORS configuration
+- HTTPS support
+- Input validation with Pydantic
+
+#### Challenge 5: Integration
+**Problem**: Legacy industrial protocols
+**Solution**:
+- Complete Modbus TCP support
+- Flexible configuration system
+- Multiple interface options (CLI, API, Web)
+- Standard data formats
+
+### 6. Contribution and Innovation Points
+
+#### Technical Contributions
+1. **Modern Async Architecture**: First async/await implementation for industrial monitoring
+2. **Comprehensive Error Handling**: Robust fault tolerance for industrial environments
+3. **Flexible Configuration**: Pydantic-based configuration management
+4. **Real-time Data Processing**: Redis integration for time-series data
+5. **Modern UI**: Vue 3 + Vite for industrial web interfaces
+
+#### Community Contributions
+1. **Open Source**: Complete implementation available for learning
+2. **Documentation**: Comprehensive guides and examples
+3. **Docker Support**: Easy deployment for development
+4. **Testing Framework**: Simulators for development without hardware
+
+#### Innovation Points
+1. **Unified Interface**: Single system for multiple use cases
+2. **Developer Experience**: Modern tooling and workflow
+3. **Production Ready**: Containerized deployment with monitoring
+4. **Extensible Design**: Easy to add new features and protocols
+
+### 7. Future Development Opportunities
+
+#### Near-term Enhancements
+- WebSocket support for real-time updates
+- User authentication and authorization
+- Database integration (PostgreSQL, TimescaleDB)
+- Mobile-responsive design
+- Advanced data visualization
+
+#### Long-term Features
+- Multiple protocol support (OPC-UA, BACnet)
+- Edge computing capabilities
+- Machine learning integration
+- Cloud deployment options
+- Advanced analytics dashboards
+
+---
+
+**Last Updated**: 2025-12-30
+**Project Version**: 0.1.0
+**Python Version**: >= 3.10
 **Maintenance Status**: 🟢 Active Development
 
 ### Current Docker Configuration
