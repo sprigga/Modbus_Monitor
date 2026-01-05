@@ -914,53 +914,70 @@ skinparam sequence {
     LifeLineBorderColor #333333
     ParticipantBorderColor #333333
     ActorBorderColor #333333
+    BoxPadding 10
 }
 
 title Modbus Monitor - System Communication Flow
 
 actor "User" as User
-participant "Frontend\n(Vue 3 + Vite)" as Frontend
+participant "Frontend\n(Vue 3)" as Frontend
 participant "Backend API\n(FastAPI)" as Backend
 participant "Modbus Service" as ModbusService
 participant "Redis" as Redis
 participant "Modbus Device" as Device
 
+== Connection Phase ==
+
 User -> Frontend : Configure Connection
 Frontend -> Backend : POST /api/config
-Backend -> Backend : Update Configuration
+Backend --> Frontend : Config Updated
+
+User -> Frontend : Click Connect
 Frontend -> Backend : POST /api/connect
 Backend -> ModbusService : Establish Connection
-ModbusService -> Device : TCP Connection
-Device --> ModbusService : Connection Status
-ModbusService --> Backend : Status Update
-Backend --> Frontend : API Response
-Frontend --> User : Connection Status
+ModbusService -> Device : TCP Connect (Port 502)
+Device --> ModbusService : Connection Accepted
+ModbusService --> Backend : Status: Connected
+Backend --> Frontend : 200 OK
+Frontend --> User : Show "Connected"
 
+== Monitoring Phase ==
+
+User -> Frontend : Start Monitoring
 Frontend -> Backend : POST /api/start_monitoring
 Backend -> ModbusService : Start Monitoring Loop
-ModbusService -> Device : Read Registers
-Device --> ModbusService : Register Data
-ModbusService -> Redis : Store Data (latest)
-ModbusService -> Redis : Store Data (history)
-ModbusService --> Backend : Data Update
-Backend -> Frontend : Data Update
-Frontend -> User : Real-time Display
 
+loop Every Poll Interval
+    ModbusService -> Device : Read Registers
+    Device --> ModbusService : Register Data
+    ModbusService -> Redis : Store Latest (JSON)
+    ModbusService -> Redis : Add to History (ZSET)
+    ModbusService --> Backend : Data Update
+    Backend --> Frontend : GET /api/data/latest
+    Frontend --> User : Update Display
+end
+
+== Manual Read Phase ==
+
+User -> Frontend : Manual Read Request
 Frontend -> Backend : POST /api/read
 Backend -> ModbusService : Read Command
 ModbusService -> Device : Read Request
 Device --> ModbusService : Register Values
 ModbusService --> Backend : Response Data
-Backend --> Frontend : JSON Data
-Frontend -> User : Display Results
+Backend --> Frontend : JSON Response
+Frontend --> User : Display Results
 
+== Write Phase ==
+
+User -> Frontend : Write Request
 Frontend -> Backend : POST /api/write
 Backend -> ModbusService : Write Command
-ModbusService -> Device : Write Request
+ModbusService -> Device : Write Request (FC06/FC16)
 Device --> ModbusService : Write Ack
-ModbusService --> Backend : Success/Fail
+ModbusService --> Backend : Success
 Backend --> Frontend : Operation Result
-Frontend -> User : Feedback
+Frontend --> User : Show Feedback
 
 @enduml
 ```
@@ -979,77 +996,58 @@ skinparam component {
 title Modbus Monitor - Data Flow Architecture
 
 package "Frontend Layer" {
-    component [Vue 3 App] as VueApp
-    component [API Client] as API
-    component [UI Components] as UI
+    component [Vue 3 App\n(Configuration,\nManualRead,\nWriteRegister,\nDataDisplay)] as VueApp
+    component [API Client\n(Axios)] as API
 }
 
 package "Backend Layer" {
-    component [FastAPI Server] as FastAPI
-    component [Modbus Service] as Modbus
-    component [Redis Client] as Redis
+    component [FastAPI Server\n(REST API)] as FastAPI
+    component [Modbus Service\n(Async Operations)] as Modbus
 }
 
 package "Data Layer" {
-    component [Latest Data Cache] as LatestCache
-    component [Historical Data] as History
+    component [Redis Database\n(Latest Cache +\nTime-Series History)] as RedisDB
 }
 
 package "Device Layer" {
-    component [Modbus TCP Client] as TCPClient
-    component [Register Manager] as RegisterManager
-    component [Error Handler] as ErrorHandler
+    component [Modbus TCP Client\n(pymodbus)] as TCPClient
+    component [Modbus Device\n(PLC/Sensors)] as ModbusDevice
 }
 
-' Frontend relationships
+' Relationships
 VueApp --> API : HTTP/REST
 API --> FastAPI : API Calls
-UI --> VueApp : User Events
-API --> UI : Data Updates
-
-' Backend relationships
 FastAPI --> Modbus : Service Calls
 Modbus --> TCPClient : Async Operations
-TCPClient --> RegisterManager : Register Operations
-RegisterManager --> ErrorHandler : Error Handling
-
-' Data relationships
-Modbus --> Redis : Data Storage
-Redis --> LatestCache : Latest Values
-Redis --> History : Time-Series Data
-LatestCache --> FastAPI : Data Retrieval
-History --> FastAPI : Data Retrieval
-
-' Device relationships
-TCPClient --> ModbusDevice : TCP Connection
-ModbusDevice --> RegisterManager : Data Exchange
+TCPClient --> ModbusDevice : TCP Connection (Port 502)
+Modbus --> RedisDB : Store/Retrieve Data
+RedisDB --> FastAPI : Data Queries
 
 note right of VueApp
-    Frontend Components:
-    - Configuration.vue
-    - ManualRead.vue
-    - WriteRegister.vue
-    - DataDisplay.vue
-end note
-
-note right of FastAPI
-    API Endpoints:
+    **Frontend Responsibilities**
+    - User Interface
     - Configuration Management
-    - Connection Control
-    - Read/Write Operations
-    - Monitoring Control
-    - Data Retrieval
+    - Real-time Data Display
+    - User Input Validation
 end note
 
-note right of Redis
-    Data Storage:
+note right of Modbus
+    **Modbus Service Features**
+    - Connection Management
+    - Register Read/Write
+    - Continuous Monitoring
+    - Error Recovery
+end note
+
+note right of RedisDB
+    **Redis Storage**
     - modbus:latest (JSON)
     - modbus:history (Sorted Set)
-    - Configurable retention
+    - Configurable retention (1000 entries)
 end note
 
-note right of ModbusDevice
-    Device Support:
+note bottom of ModbusDevice
+    **Supported Modbus Operations**
     - Holding Registers (FC03, FC06, FC16)
     - Input Registers (FC04)
     - Coils (FC01, FC05, FC15)
@@ -1226,27 +1224,26 @@ ModbusConfig "1" *-- "1" AsyncModbusMonitor : uses
 AsyncModbusMonitor "1" *-- "*" RegisterDefinition : manages
 AsyncModbusMonitor "1" --> "1" RedisManager : uses
 ModbusData "1" --> "1" RegisterDefinition : based on
-RedisManager "1" --> "*" ModbusData : stores
+RedisManager "1" o-- "*" ModbusData : stores
 
-' Notes
 note right of AsyncModbusMonitor
-    Key Methods:
-    - Async operations using asyncio
-    - Automatic reconnection
-    - Error handling with retries
+    **Key Features**
+    - Async operations (asyncio)
+    - Auto reconnection
+    - Error handling & retries
     - Concurrent register reading
 end note
 
 note right of RegisterDefinition
-    Register Types:
+    **Register Types**
     - holding (FC03, FC06, FC16)
     - input (FC04)
     - coils (FC01, FC05, FC15)
     - discrete (FC02)
 end note
 
-note right of RedisManager
-    Redis Keys:
+note bottom of RedisManager
+    **Redis Keys**
     - modbus:latest (JSON)
     - modbus:history (Sorted Set)
 end note
@@ -1265,101 +1262,76 @@ skinparam state {
     ArrowColor #0066cc
     StartColor #00cc66
     EndColor #cc0000
-    StateBackgroundColor #ffffff
 }
 
 title Modbus Monitor - Connection State Management
 
 [*] --> Disconnected
 
-state Disconnected {
-    [*] --> Connecting
-    Connecting --> Connected : Success
-    Connecting --> Disconnected : Failed/Timeout
-    Connecting --> Error : Connection Error
-
-    state "No Connection" as DisconnectedState
-    DisconnectedState --> Connecting : Connect Request
-}
-
-state Connected {
-    Connected --> Monitoring : Start Monitoring
-    Connected --> ManualRead : Read Request
-    Connected --> ManualWrite : Write Request
-    Connected --> Disconnecting : Disconnect Request
-
-    state "Idle" as IdleState
-    state "Active" as ActiveState
-    IdleState --> ActiveState : Activity
-    ActiveState --> IdleState : Inactivity
-}
-
-state Monitoring {
-    Monitoring --> Monitoring : Poll Cycle
-    Monitoring --> ManualRead : Read Request
-    Monitoring --> ManualWrite : Write Request
-    Monitoring --> Stopping : Stop Request
-    Monitoring --> Disconnected : Error/Lost Connection
-
-    state "Polling" as PollingState
-    PollingState --> PollingState : Successful Read
-    PollingState --> Monitoring : Continue
-}
-
-state Error {
-    Error --> Error : Handle Error
-    Error --> Connecting : Retry
-    Error --> Disconnected : Max Retries Exceeded
-}
-
+state Disconnected
 state Connecting
-state Disconnecting {
-    Disconnecting --> Disconnected : Complete
-    Disconnecting --> Error : Error During Disconnect
-}
-
+state Connected
+state Monitoring
 state ManualRead
 state ManualWrite
+state Disconnecting
+state Error
 state Stopping
 
-' Transitions
+' Main state transitions
 Disconnected --> Connecting : connect()
-Connecting --> Connected : Connection Success
+Connecting --> Connected : Success
 Connecting --> Error : Connection Failed
-Connecting --> Disconnected : Cancel Request
+Connecting --> Disconnected : Cancel/Timeout
 
 Connected --> Monitoring : start_monitoring()
 Connected --> ManualRead : read_registers()
-Connected --> ManualWrite : write_register()
+Connected --> ManualWrite : write_registers()
 Connected --> Disconnecting : disconnect()
 
-Monitoring --> ManualRead : Interrupt for read
-Monitoring --> ManualWrite : Interrupt for write
+Monitoring --> Monitoring : Poll Cycle (Successful)
 Monitoring --> Stopping : stop_monitoring()
+Monitoring --> ManualRead : Interrupt (Read Request)
+Monitoring --> ManualWrite : Interrupt (Write Request)
+Monitoring --> Error : Connection Lost
+Monitoring --> Connected : Pause Monitoring
 
-ManualRead --> Connected : Complete
-ManualWrite --> Connected : Complete
+ManualRead --> Connected : Operation Complete
+ManualWrite --> Connected : Operation Complete
+ManualRead --> Error : Read Failed
+ManualWrite --> Error : Write Failed
 
-Stopping --> Connected : Monitor Restarted
-Stopping --> Disconnected : Fully Stopped
+Stopping --> Connected : Restart Monitoring
+Stopping --> Disconnected : Stop Complete
 
-Error --> Connecting : Retry after delay
-Error --> Disconnected : Give up
+Disconnecting --> Disconnected : Disconnect Complete
+Disconnecting --> Error : Disconnect Failed
 
+Error --> Connecting : Auto Retry (Limit: 5)
+Error --> Disconnected : Max Retries Exceeded
+
+' Notes
 note right of Monitoring
-    Monitoring State:
+    **Monitoring Features**
     - Continuous polling
-    - Data storage in Redis
-    - Error recovery
-    - Configuration updates supported
+    - Redis data storage
+    - Auto error recovery
+    - Config update support
 end note
 
-note right of Error
-    Error Handling:
+note bottom of Error
+    **Error Recovery**
     - Configurable retry count
     - Exponential backoff
     - Graceful degradation
-    - User notification
+    - User notifications
+end note
+
+note top of Connected
+    **Ready State**
+    - Connected to device
+    - Accepting commands
+    - Idle or waiting
 end note
 
 @enduml
@@ -1481,41 +1453,42 @@ title Modbus Monitor - Configuration Workflow
 start
 
 :User opens Configuration Panel;
-if (Configuration exists?) then (yes)
-    :Display current config;
+
+if (Existing config?) then (yes)
+    :Display current configuration;
     :User modifies parameters;
+    note right
+        **Editable Parameters**
+        - Modbus Host, Port, Device ID
+        - Poll Interval, Timeout
+        - Register Ranges
+    end note
 else (no)
-    :Load default values;
+    :Load default values from .env;
     :User enters parameters;
 endif
 
 :Validate input parameters;
 if (Valid?) then (yes)
     :Update Configuration object;
-    :Save to environment variables;
     :Send POST /api/config;
-    :Backend updates Pydantic config;
+    note right
+        **API Request**
+        Validated by Pydantic
+    end note
+    :Backend updates config;
     :Store in Redis cache;
+    :Return success response;
 else (no)
     :Show validation errors;
     :Highlight invalid fields;
-    :Retry configuration;
+    :Wait for user correction;
 endif
 
 :Update UI with new config;
-:Show success message;
+:Show success notification;
 
 stop
-
-note right of User opens Configuration Panel
-    Configuration Options:
-    - Modbus Host (IP)
-    - Modbus Port
-    - Device ID
-    - Poll Interval
-    - Timeout Settings
-    - Register Ranges
-end note
 
 @enduml
 ```
@@ -1535,27 +1508,39 @@ skinparam activity {
 
 title Modbus Monitor - Monitoring Workflow
 
-:start_monitoring
+start
 
+:User clicks Start Monitoring;
 :Initialize monitoring loop;
-:Set up register list;
+:Set up register list from config;
 :Start asyncio tasks;
 
 repeat
     :Check connection status;
     if (Connected?) then (yes)
         :Read all configured registers;
-        if (Success?) then (yes)
+        note right
+            **Concurrent Reading**
+            asyncio.gather()
+        end note
+
+        if (Read success?) then (yes)
             :Process register data;
             :Apply scaling/conversion;
             :Store in Redis (latest);
             :Add to Redis history;
+            note right
+                **Redis Storage**
+                - Latest: JSON
+                - History: Sorted Set
+                - Retention: 1000 entries
+            end note
             :Update UI via API;
             :Wait for poll interval;
         else (no)
-            :Handle error;
+            :Handle read error;
             :Increment error counter;
-            if (Max errors?) then (yes)
+            if (Max errors reached?) then (yes)
                 :Attempt reconnection;
             else (no)
                 :Continue monitoring;
@@ -1566,32 +1551,18 @@ repeat
         if (Success?) then (yes)
             :Reset error counter;
         else (no)
-            :Wait before retry;
+            :Wait with exponential backoff;
         endif
     endif
-repeat while (Monitoring active)
+repeat while (Monitoring active?) is (yes)
+
+-> No;
 
 :Stop monitoring loop;
-:Close connections;
+:Close Modbus connection;
 :Clean up resources;
 
-:end_monitoring
-
-note right of Read all configured registers
-    Read Operations:
-    - Concurrent reading with asyncio.gather()
-    - Batch requests for efficiency
-    - Error handling per register
-    - Timeout management
-end note
-
-note right of Store in Redis
-    Data Storage:
-    - Latest: JSON format for immediate access
-    - History: Sorted set with timestamp
-    - Configurable retention policy
-    - Fast retrieval for UI updates
-end note
+stop
 
 @enduml
 ```
@@ -1611,43 +1582,13 @@ skinparam activity {
 
 title Modbus Monitor - Error Recovery Workflow
 
-:Error Occurred;
+start
+
+:Error detected;
 
 :Determine error type;
-if (Connection Error?) then (yes)
-    :Close connection;
-    :Increment consecutive errors;
-    if (Max errors reached?) then (yes)
-        :Log critical error;
-        :Notify user;
-        :Stop monitoring;
-        :Exit recovery;
-    else (no)
-        :Wait exponential backoff;
-        :Attempt reconnection;
-        if (Success?) then (yes)
-            :Reset error counter;
-            :Continue monitoring;
-        else (no)
-            :Retry connection;
-        endif
-    endif
-else if (Read Error?) then (yes)
-    :Log read error;
-    :Mark registers as failed;
-    :Continue with other registers;
-    :Update UI with error status;
-else if (Write Error?) then (yes)
-    :Log write error;
-    :Notify user of failure;
-    :Update UI with error message;
-    :Continue normal operation;
-endif
-
-:Error recovery complete;
-
-note right of Determine error type
-    Error Types:
+note right
+    **Error Types**
     - Connection Timeout
     - Network Unreachable
     - Modbus Exception
@@ -1656,13 +1597,51 @@ note right of Determine error type
     - Redis Connection
 end note
 
-note right of Exponential backoff
-    Backoff Strategy:
-    - Initial: 1 second
-    - Multiplier: 2x
-    - Maximum: 30 seconds
-    - Jitter: Random ±10%
-end note
+if (Connection Error?) then (yes)
+    :Close Modbus connection;
+    :Increment consecutive_errors;
+    if (Max errors >= 5?) then (yes)
+        :Log critical error;
+        :Notify user;
+        :Stop monitoring;
+        stop
+    else (no)
+        :Calculate exponential backoff;
+        note right
+            **Backoff Strategy**
+            Initial: 1s
+            Multiplier: 2x
+            Max: 30s
+            Jitter: ±10%
+        end note
+        :Wait for backoff period;
+        :Attempt reconnection;
+        if (Success?) then (yes)
+            :Reset error counter;
+            :Resume monitoring;
+        else (no)
+            :Retry connection attempt;
+        endif
+    endif
+elseif (Read Error?) then (yes)
+    :Log read error;
+    :Mark specific register failed;
+    :Continue with other registers;
+    :Update UI with error status;
+elseif (Write Error?) then (yes)
+    :Log write error;
+    :Notify user of failure;
+    :Update UI with error message;
+    :Continue normal operation;
+else (Other errors)
+    :Log generic error;
+    :Notify user if needed;
+    :Continue operation;
+endif
+
+:Error recovery complete;
+
+stop
 
 @enduml
 ```
