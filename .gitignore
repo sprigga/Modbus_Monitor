@@ -15,4 +15,7 @@ __pycache__/
 # Terminal Paste Image folder
 .cp-images/
 
+# Git worktrees
+.worktrees/
+
 frontend/
