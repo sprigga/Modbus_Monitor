@@ -67,100 +67,40 @@ cd frontend-vite && npm install && npm run dev
 ### 4. API Documentation Interface
 Visit `http://localhost:8000/docs` to see the complete Swagger UI interactive API documentation, allowing developers to quickly test all endpoints (connection, read, write, monitoring, data query, etc.).
 
-## 📁 Project Structure Analysis
-
-### Core File Overview
+## 📁 Project Structure
 
 ```
 modbus_monitor/
-├── pyproject.toml               - UV project configuration and dependencies
-├── docker-compose.yml           - Multi-container orchestration (Redis, Backend, Frontend)
-├── requirements.txt             - Python dependencies
-├── .env.example                 - Environment variables template
-├── config.conf.example          - Alternative INI configuration template
 ├── scripts/
-│   ├── async_modbus_monitor.py  (377 lines) - Core asynchronous Modbus client library
-│   ├── start_backend.py         (28 lines)  - Backend service startup script
-│   └── start_dev.sh            - Development environment setup script
+│   ├── async_modbus_monitor.py  - Core asynchronous Modbus client library (377 lines)
+│   └── start_backend.py         - Backend service startup script
 ├── backend/
-│   ├── main.py                  (382 lines) - FastAPI REST API application with CORS
-│   ├── config.py                (289 lines) - Pydantic-based configuration management
-│   ├── modbus_service.py        (297 lines) - Modbus service with Redis integration
-│   ├── Dockerfile               - Backend container configuration
-│   └── requirements.txt         - Python backend dependencies
-├── frontend/                    (Legacy frontend)
-│   ├── index.html               (518 lines) - Vue 3 single-page application
-│   ├── app.js                  - Frontend application logic
-│   └── css/styles.css           - Glass-morphism UI styling
-├── frontend-vite/               (Modern Vue 3 + Vite frontend)
+│   ├── main.py                  - FastAPI REST API application with CORS
+│   ├── config.py                - Pydantic-based configuration management
+│   ├── modbus_service.py        - Modbus service with Redis integration
+│   └── Dockerfile               - Backend container configuration
+├── frontend/                    - Legacy single-page Vue 3 application
+│   ├── index.html
+│   ├── app.js
+│   └── css/styles.css
+├── frontend-vite/               - Modern Vue 3 + Vite frontend (Recommended)
 │   ├── src/
 │   │   ├── App.vue              - Root Vue component
 │   │   ├── main.js              - Application entry point
-│   │   ├── components/
-│   │   │   ├── AlertContainer.vue
-│   │   │   ├── Configuration.vue
-│   │   │   ├── DataDisplay.vue
-│   │   │   ├── ManualRead.vue
-│   │   │   └── WriteRegister.vue
-│   │   ├── composables/
-│   │   │   └── useAlerts.js
-│   │   ├── services/
-│   │   │   └── api.js            - Axios API client
-│   │   └── assets/
-│   │       ├── styles.css
-│   │       └── page-styles.css
-│   ├── index.html                - HTML entry point
-│   ├── vite.config.js            - Vite configuration
-│   ├── package.json              - Node.js dependencies
-│   └── Dockerfile               - Frontend container image
+│   │   ├── components/          - Modular Vue components
+│   │   ├── composables/         - Vue composables (useAlerts.js)
+│   │   └── services/            - Axios API client
+│   └── Dockerfile               - Frontend container with Nginx
 ├── docs/
 │   ├── CLAUDE.md                - Development guidelines
-│   ├── configuration.md          - Detailed configuration guide
+│   ├── configuration.md         - Detailed configuration guide
 │   ├── USAGE.md                 - Usage instructions
-│   ├── UML.md                   - System architecture diagrams
-│   └── REFACTOR_SUMMARY.md      - Project refactoring documentation
-├── docker-compose.yml           - Three-container orchestration
-├── Dockerfile.backend           - Backend container image
+│   └── UML.md                   - System architecture diagrams
+├── docker-compose.yml           - Multi-container orchestration
 ├── pyproject.toml               - UV project configuration
 ├── requirements.txt             - Python dependencies
-├── .env.example                 - Environment variable template
-├── config.conf.example           - Alternative config file template
-└── README.md                    - This file
+└── .env.example                 - Environment variables template
 ```
-
-### File Function Descriptions
-
-#### Core Modules
-- **scripts/async_modbus_monitor.py**: Standalone asynchronous Modbus client library with comprehensive read/write operations, connection management, monitoring capabilities, and error handling. Can be used independently or as a foundation for other applications.
-
-#### Backend Services
-- **backend/main.py**: FastAPI application providing RESTful API endpoints for Modbus operations, configuration management, data retrieval, and background monitoring tasks with CORS middleware.
-- **backend/config.py**: Pydantic-based configuration management using pydantic-settings, supporting environment variables, validation, and multiple configuration sources.
-- **backend/modbus_service.py**: Extended Modbus service integrating Redis for real-time data storage, historical data management, and time-series operations.
-- **scripts/start_backend.py**: Backend service startup script using uvicorn with configurable host and port settings.
-
-#### Frontend Applications
-
-**Legacy Frontend (`frontend/`)**:
-- **frontend/index.html**: Vue 3 single-page application with glass-morphism design.
-- **frontend/app.js**: Vue application logic handling API communication.
-- **frontend/css/styles.css**: Responsive CSS with modern gradient effects.
-
-**Modern Frontend (`frontend-vite/`)**:
-- **frontend-vite/src/App.vue**: Root Vue component with alert system and routing.
-- **frontend-vite/src/main.js**: Application entry point with Vue 3 and Element Plus.
-- **frontend-vite/src/components/**: Modular Vue components for different features.
-- **frontend-vite/src/composables/useAlerts.js**: Composable for alert/toast notifications.
-- **frontend-vite/src/services/api.js**: Axios-based API client with interceptors.
-- **frontend-vite/vite.config.js**: Vite build configuration.
-
-#### Configuration & Deployment
-- **pyproject.toml**: UV project configuration defining dependencies, build system, and project metadata with modern Python packaging standards.
-- **docker-compose.yml**: Multi-container orchestration (Redis, FastAPI Backend, Vue Frontend) with custom port mapping and volume management.
-- **backend/Dockerfile**: FastAPI service container definition with Python 3.11 base image and optimized build process.
-- **frontend-vite/Dockerfile**: Vue 3 frontend container with Nginx serving built static files.
-- **.env.example**: Comprehensive environment variable configuration template covering Modbus, Redis, API, and logging settings.
-- **config.conf.example**: Alternative INI-based configuration template for file-based configuration.
 
 ## 🏗️ System Architecture
 
@@ -434,11 +374,9 @@ start_address = 1
 end_address = 26
 ```
 
-## 📦 Dependency Analysis
+## 📦 Dependencies
 
-### Python Dependencies (`requirements.txt`, `pyproject.toml`)
-
-#### Project Dependencies (pyproject.toml)
+### Python
 ```toml
 [project]
 name = "modbus-monitor"
@@ -446,23 +384,15 @@ version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.104.0",           # Modern web framework
-    "uvicorn[standard]>=0.24.0",  # ASGI server with websocket support
-    "python-multipart>=0.0.6",   # Form data handling
-    "pymodbus>=3.0.0",           # Modbus protocol implementation
+    "uvicorn[standard]>=0.24.0",  # ASGI server
+    "pymodbus>=3.0.0",           # Modbus protocol
     "redis>=5.0.0",              # Redis async client
-    "python-dotenv>=1.0.0",      # Environment variable management
-    "pydantic>=2.0.0"            # Data validation and settings
+    "python-dotenv>=1.0.0",      # Environment variables
+    "pydantic>=2.0.0"            # Data validation
 ]
 ```
 
-#### Additional Backend Dependencies
-- **pydantic-settings**: Configuration management with environment variable support
-- **asyncio**: Built-in Python async/await framework
-- **logging**: Comprehensive logging system
-
-### Frontend Dependencies (`frontend-vite/package.json`)
-
-#### Modern Frontend
+### Frontend (`frontend-vite/`)
 ```json
 {
   "dependencies": {
@@ -470,19 +400,11 @@ dependencies = [
     "axios": "^1.13.2"           // HTTP client
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.1", // Vite Vue plugin
-    "vite": "^7.2.4"              // Build tool
+    "@vitejs/plugin-vue": "^6.0.1",
+    "vite": "^7.2.4"
   }
 }
 ```
-
-### System Dependencies
-
-- **Python**: >= 3.10 (uses modern type hints and async features)
-- **Redis**: >= 7.0 (for time-series data storage)
-- **Node.js**: >= 18 (for frontend-vite development)
-- **UV**: Python package manager (recommended, 10-100x faster than pip)
-- **Docker**: >= 20.10 (optional, for containerized deployment)
 
 ## 🔧 Installation and Setup
 
@@ -494,165 +416,103 @@ dependencies = [
 - **UV**: Python package manager (recommended)
 - **Docker**: >= 20.10 (optional)
 
-### Method 1: Using UV (Recommended)
+## 🔧 Installation and Setup
+
+### Prerequisites
+
+- **Python**: >= 3.10
+- **Redis**: >= 7.0
+- **Node.js**: >= 18 (for frontend-vite development)
+- **Docker**: >= 20.10 (optional, for containerized deployment)
+
+### Method 1: Docker Compose (Recommended for Production)
 
 ```bash
-# 1. Install UV
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 2. Clone project
-git clone https://github.com/sprigga/modbus_monitor.git
-cd modbus_monitor
-
-# 3. Sync dependencies
-uv sync
-
-# 4. Configure environment
+# Configure environment
 cp .env.example .env
 nano .env  # Edit MODBUS_HOST, etc.
 
-# 5. Start Redis (if needed)
-docker run -d -p 6379:6379 --name modbus-redis redis:7-alpine
-
-# 6. Run backend
-uv run python scripts/start_backend.py
-
-# 7. Run frontend (modern - Vite)
-cd frontend-vite
-npm install
-npm run dev
-# Access at http://localhost:5173
-
-# Alternative: Use Docker Compose
+# Start all services
 docker-compose up -d --build
-```
 
-### Method 2: Using Docker Compose
-
-```bash
-# 1. Configure environment
-cp .env.example .env
-nano .env
-
-# 2. Start all services
-docker-compose up -d
-
-# 3. Check status
-docker-compose ps
-
-# 4. View logs
-docker-compose logs -f backend
-
-# 5. Access services
-# - Modern Frontend: http://localhost:18081
-# - Legacy Frontend: http://localhost:8081 (if running separately)
+# Access services
+# - Frontend: http://localhost:18081
 # - API Docs: http://localhost:18000/docs
 # - Redis: localhost:16380
 
-# 6. Stop services
+# Stop services
 docker-compose down
 ```
 
-### Method 3: Traditional Pip Installation
+### Method 2: UV (Recommended for Development)
 
 ```bash
-# 1. Create virtual environment
+# Install UV
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Setup project
+git clone https://github.com/sprigga/modbus_monitor.git
+cd modbus_monitor
+cp .env.example .env
+uv sync
+
+# Start Redis
+docker run -d -p 6379:6379 --name modbus-redis redis:7-alpine
+
+# Run backend
+uv run python scripts/start_backend.py
+
+# Run frontend (in new terminal)
+cd frontend-vite && npm install && npm run dev
+# Access at http://localhost:5173
+```
+
+### Method 3: Traditional Pip
+
+```bash
+# Setup virtual environment
 python3 -m venv venv
 source venv/bin/activate
-
-# 2. Install dependencies
 pip install -r requirements.txt
-
-# 3. Configure environment
 cp .env.example .env
 
-# 4. Run backend
+# Run backend
 python scripts/start_backend.py
 
-# 5. Run frontend (legacy)
 # Serve frontend/ folder with any web server
 ```
 
 ## 💡 Usage Examples
 
-### Example 1: Basic Read Monitoring
+### CLI Mode
+```bash
+# Run with default configuration
+uv run python scripts/async_modbus_monitor.py
 
+# Start backend server
+uv run python scripts/start_backend.py
+```
+
+### Python API
 ```python
 from scripts.async_modbus_monitor import AsyncModbusMonitor, ModbusConfig
 import asyncio
-import logging
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
-
-    config = ModbusConfig(
-        host='192.168.1.100',
-        port=502,
-        device_id=1,
-        poll_interval=2.0
-    )
-
+    config = ModbusConfig(host='192.168.1.100', port=502, device_id=1)
     monitor = AsyncModbusMonitor(config)
-
-    # Add registers to monitor
     monitor.add_register(address=0, count=10, register_type='holding', name='Temperature')
 
     if await monitor.connect():
-        print("✅ Connected!")
-        await monitor.monitor_continuously()
+        # Read registers
+        data = await monitor.read_registers(0, 10, 'holding')
+        print(f"Data: {data}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+        # Write single register
+        await monitor.write_holding_register(address=10, value=1234)
 
-### Example 2: Writing Registers
-
-```python
-from scripts.async_modbus_monitor import AsyncModbusMonitor, ModbusConfig
-import asyncio
-
-async def write_example():
-    config = ModbusConfig(host='192.168.1.100')
-    monitor = AsyncModbusMonitor(config)
-
-    if await monitor.connect():
-        # Single write
-        success = await monitor.write_holding_register(address=10, value=1234)
-        print(f"Write: {'Success' if success else 'Failed'}")
-
-        # Multiple write
-        success = await monitor.write_holding_registers(
-            address=20,
-            values=[100, 200, 300]
-        )
-        print(f"Multi-write: {'Success' if success else 'Failed'}")
-
-    await monitor.disconnect()
-
-asyncio.run(write_example())
-```
-
-### Example 3: Custom Data Processing
-
-```python
-from scripts.async_modbus_monitor import AsyncModbusMonitor, ModbusConfig
-from typing import List, Dict, Any
-import asyncio
-
-async def custom_processor(data: List[Dict[str, Any]]):
-    """Custom data handler"""
-    for item in data:
-        values = item['values']
-        avg = sum(values) / len(values)
-        print(f"{item['name']}: avg={avg:.2f}, max={max(values)}")
-
-async def main():
-    config = ModbusConfig(host='192.168.1.100', poll_interval=5.0)
-    monitor = AsyncModbusMonitor(config)
-    monitor.add_register(0, 8, 'holding', 'Sensors')
-
-    if await monitor.connect():
-        await monitor.monitor_continuously(data_callback=custom_processor)
+        # Write multiple registers
+        await monitor.write_holding_registers(address=20, values=[100, 200, 300])
 
 asyncio.run(main())
 ```
@@ -800,49 +660,12 @@ For questions, issues, or contributions:
 - **Discussions**: Community discussion and support
 - **Documentation**: See `docs/` folder for detailed guides
 
-### Getting Help
+## 📄 License
 
-1. **Configuration Issues**: Check `docs/configuration.md`
-2. **Usage Examples**: See `docs/USAGE.md`
-3. **Development**: Review `docs/CLAUDE.md` for development guidelines
-4. **Troubleshooting**: Use the troubleshooting section above
+This project is licensed under the MIT License.
 
-## � Project Summary
+## 🙏 Acknowledgements
 
-The Modbus Monitor is a production-ready, full-stack solution for industrial Modbus TCP monitoring and control. It combines modern web technologies with robust industrial protocols to provide:
-
-### 🎯 Key Capabilities
-
-- **Complete Modbus Support**: All register types (Holding, Input, Coils, Discrete) with read/write operations
-- **Real-time Monitoring**: Continuous data collection with configurable polling intervals
-- **Historical Data**: Redis-based time-series storage with configurable retention
-- **Modern Web Interface**: Vue 3 + Vite frontend with responsive design and real-time updates
-- **REST API**: Comprehensive FastAPI backend with automatic documentation
-- **Docker Deployment**: Production-ready containerized deployment with custom port configuration
-- **Flexible Configuration**: Environment variables, config files, and runtime parameter updates
-
-### 🛠️ Technology Stack
-
-| Component | Technology | Purpose |
-|-----------|------------|----------|
-| **Frontend** | Vue 3 + Vite + Axios | Modern reactive web interface |
-| **Backend** | FastAPI + Pydantic + asyncio | High-performance async API server |
-| **Database** | Redis | Real-time caching and time-series storage |
-| **Communication** | pymodbus | Async Modbus TCP client library |
-| **Deployment** | Docker Compose + Nginx | Containerized production deployment |
-| **Build System** | UV + npm | Fast dependency management |
-
-### 👥 Target Users
-
-- **Industrial Engineers**: Monitor and control PLC systems and sensors
-- **System Integrators**: Integrate Modbus devices into larger monitoring systems  
-- **Developers**: Build custom industrial automation solutions
-- **DevOps Engineers**: Deploy scalable monitoring infrastructure
-- **Students & Researchers**: Learn industrial communication protocols
-
-## �🙏 Acknowledgements
-
-### Open Source Projects
 - [pymodbus](https://github.com/pymodbus-dev/pymodbus) - Modbus protocol implementation
 - [FastAPI](https://github.com/tiangolo/fastapi) - Modern Python web framework
 - [Vue.js](https://github.com/vuejs/core) - Progressive JavaScript framework
@@ -852,130 +675,4 @@ The Modbus Monitor is a production-ready, full-stack solution for industrial Mod
 
 ---
 
-## 📊 System Architecture & Workflows
-
-> **Note**: For detailed UML diagrams (Component, Sequence, Class, State), see [docs/UML.md](docs/UML.md)
-
-### Technical Specifications
-
-#### Communication Protocol Stack
-
-| Layer | Protocol | Format | Port | Description |
-|-------|----------|--------|------|-------------|
-| **Application** | HTTP/REST | JSON | 18000 | API communication |
-| **Service** | TCP/IP | Binary | 502 | Modbus TCP protocol |
-| **Transport** | TCP | Stream | Various | Reliable delivery |
-| **Network** | IP | Packets | Various | Network routing |
-
-#### Data Formats
-
-**Request Format:**
-```json
-{
-    "address": 0,
-    "count": 10,
-    "register_type": "holding",
-    "value": 1234,
-    "values": [100, 200, 300]
-}
-```
-
-**Response Format:**
-```json
-{
-    "success": true,
-    "data": [
-        {
-            "register_name": "Temperature",
-            "address": 0,
-            "type": "holding",
-            "values": [250],
-            "timestamp": "2025-01-01T12:00:00Z"
-        }
-    ],
-    "error": null
-}
-```
-
-#### Modbus Function Codes Support
-
-| Operation | Function Code | Description | Support |
-|-----------|---------------|-------------|---------|
-| Read Holding Registers | 03 | Read 16-bit registers | ✅ |
-| Write Single Register | 06 | Write one register | ✅ |
-| Write Multiple Registers | 16 | Write multiple registers | ✅ |
-| Read Input Registers | 04 | Read analog inputs | ✅ |
-| Read Coils | 01 | Read digital outputs | ✅ |
-| Write Single Coil | 05 | Write one coil | ✅ |
-| Write Multiple Coils | 15 | Write multiple coils | ✅ |
-| Read Discrete Inputs | 02 | Read digital inputs | ✅ |
-
-### Workflow Summaries
-
-**Configuration Flow:**
-1. User opens panel → Load existing config or defaults
-2. Validate parameters (Pydantic) → POST /api/config
-3. Backend updates config → Store in Redis → UI feedback
-
-**Monitoring Flow:**
-1. Start monitoring → Initialize asyncio tasks
-2. Loop: Read registers (asyncio.gather) → Store in Redis (JSON + Sorted Set)
-3. Error handling: Max 5 consecutive errors → Auto-reconnect with exponential backoff
-4. Stop: Clean up resources and close connections
-
-**Error Recovery:**
-- **Connection errors**: Retry with backoff (1s → 30s max), stop after 5 failures
-- **Read/Write errors**: Log, notify user, continue with other operations
-- **Backoff strategy**: 2x multiplier with ±10% jitter
-
-> **Detailed flowcharts** available in [docs/UML.md](docs/UML.md)
-
-### Industry Applications
-
-| Sector | Use Cases |
-|--------|-----------|
-| **Industrial Automation** | PLC monitoring, sensor data collection, process control, predictive maintenance |
-| **Building Management** | HVAC/lighting control, energy monitoring, security systems |
-| **Manufacturing** | Production line monitoring, quality control, inventory/equipment tracking |
-| **Agriculture** | Greenhouse control, irrigation systems, livestock environmental monitoring |
-
-### Key Technical Solutions
-
-| Challenge | Solution |
-|-----------|----------|
-| **Real-time Performance** | Async I/O, concurrent reads (asyncio.gather), Redis caching |
-| **Reliability** | Auto-reconnect with backoff, retry mechanisms, validation |
-| **Scalability** | Async design, Redis storage, configurable retention |
-| **Security** | Network isolation, CORS, HTTPS, Pydantic validation |
-| **Integration** | Complete Modbus support, flexible config, multiple interfaces |
-
-### Innovation Highlights
-
-- **First async/await** implementation for industrial monitoring
-- **Pydantic-based** configuration with validation
-- **Redis time-series** integration for historical data
-- **Modern stack** (Vue 3 + Vite + FastAPI) for industrial applications
-- **Production-ready** Docker deployment with comprehensive documentation
-
----
-
-**Last Updated**: 2025-12-30
-**Project Version**: 0.1.0
-**Python Version**: >= 3.10
-**Maintenance Status**: 🟢 Active Development
-
-### Current Docker Configuration
-- **Redis**: Port 16380 → 6379 (internal)
-- **Backend**: Port 18000 → 18000 (FastAPI + uvicorn)
-- **Frontend**: Port 18081 → 80 (Nginx + Vue 3)
-
-### Development Ports (Direct)
-- **Backend**: Port 8000 (uvicorn)
-- **Frontend**: Port 5173 (Vite dev server)
-- **Redis**: Port 6379
-
-### Build System
-- **Package Manager**: UV (recommended) or pip
-- **Frontend Build**: Vite + Vue 3
-- **Backend Framework**: FastAPI with async/await
-- **Database**: Redis for caching and time-series data
+**Last Updated**: 2025-12-30 | **Version**: 0.1.0 | **Python**: >= 3.10
