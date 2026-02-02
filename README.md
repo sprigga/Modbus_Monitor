@@ -996,7 +996,7 @@ flowchart TB
     API -->|API Calls| FastAPI
     FastAPI -->|Service Calls| Modbus
     Modbus -->|Async Operations| TCPClient
-    TCPClient -->|TCP Connection<br/>(Port 502)| ModbusDevice
+    TCPClient -->|TCP Connection<br/>Port 502| ModbusDevice
     Modbus -->|Store/Retrieve Data| RedisDB
     RedisDB -->|Data Queries| FastAPI
 
@@ -1200,7 +1200,7 @@ stateDiagram-v2
     Disconnecting --> Disconnected : Disconnect Complete
     Disconnecting --> Error : Disconnect Failed
 
-    Error --> Connecting : Auto Retry (Limit: 5)
+    Error --> Connecting : Auto Retry - Limit 5
     Error --> Disconnected : Max Retries Exceeded
 
     note right of Monitoring
