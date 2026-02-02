@@ -164,45 +164,35 @@ modbus_monitor/
 
 ## 🏗️ System Architecture
 
+For detailed architecture diagrams (Component, Sequence, Class, State diagrams), see [docs/UML.md](docs/UML.md).
+
 ### Three-Tier Architecture Design
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  Web Frontend (Vue 3)                    │
-│         Modern Component-Based UI (Vite/Legacy)        │
+│    Presentation Layer: Vue 3 Frontend (Vite/Legacy)     │
+│  - Configuration Interface  - Real-time Data Display    │
 └────────────────────┬────────────────────────────────────┘
-                     │ HTTP/REST API
+                     │ HTTP/REST API (JSON)
 ┌────────────────────▼────────────────────────────────────┐
-│              FastAPI Backend Service                     │
-│          (Async HTTP Server + Redis Integration)         │
-│  - Config Management (Pydantic Settings)               │
-│  - Request Validation (Pydantic Models)                 │
+│    Business Logic: FastAPI Backend + Modbus Service     │
+│  - Pydantic Config/Validation  - Async Operations       │
 └────────────────────┬────────────────────────────────────┘
-                     │
-        ┌────────────┼────────────┐
-        │                         │
-┌───────▼────────┐     ┌─────────▼──────────┐
-│  Modbus Service│     │   Redis Database    │
-│  (Async TCP)    │     │  (Time-Series Data) │
-│  - Connection    │     │  - Latest Data      │
-│  - Read/Write    │     │  - History (1000)   │
-└───────┬────────┘     └────────────────────┘
-        │
-┌───────▼────────────────────────┐
-│    Modbus TCP Devices           │
-│  (PLC, Sensors, Controllers)  │
-└────────────────────────────────┘
+                     │ TCP/IP + Redis
+┌────────────────────▼────────────────────────────────────┐
+│    Data/Device Layer: Redis + Modbus TCP Devices        │
+│  - Time-Series Storage  - PLC/Sensors (Port 502)        │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Key Architecture Features
+### Key Features
 
-1. **Asynchronous Design**: Built on Python asyncio for high performance and concurrency
-2. **Configuration Management**: Pydantic-based settings with validation and environment variable support
-3. **Data Persistence**: Redis integration for real-time caching, latest data, and historical time-series data (sorted sets)
-4. **Modular Components**: Each component can be developed, deployed, and scaled independently
-5. **Modern Frontend**: Vue 3 with Vite build system, component architecture, and Axios API client
-6. **Container Architecture**: Docker Compose orchestration with custom port mapping for production deployment
-7. **Development Flexibility**: Support for both containerized and direct development workflows
+1. **Async I/O**: Python asyncio for concurrent connections
+2. **Type Safety**: Pydantic validation for config and API models
+3. **Real-time Caching**: Redis sorted sets for time-series data (1000-entry retention)
+4. **Modular Design**: Independent component deployment/scaling
+5. **Modern Stack**: Vue 3 + Vite + FastAPI + Docker Compose
+6. **Flexible Deployment**: Container or direct development workflows
 
 ## 🎯 Technical Features Analysis
 
@@ -671,44 +661,12 @@ asyncio.run(main())
 
 ### REST API Reference
 
-FastAPI automatically generates interactive documentation:
-- **Swagger UI**: http://localhost:18000/docs (Docker) or http://localhost:8000/docs (Direct)
-- **ReDoc**: http://localhost:18000/redoc (Docker) or http://localhost:8000/redoc (Direct)
-- **OpenAPI JSON**: http://localhost:18000/openapi.json (Docker) or http://localhost:8000/openapi.json (Direct)
+FastAPI auto-generates interactive documentation:
+- **Swagger UI**: `http://localhost:18000/docs` (Docker) or `http://localhost:8000/docs` (Direct)
+- **ReDoc**: `http://localhost:18000/redoc`
+- **OpenAPI JSON**: `http://localhost:18000/openapi.json`
 
-### Key API Endpoints
-
-#### 1. Configuration
-```http
-GET /api/config
-POST /api/config
-```
-
-#### 2. Connection Control
-```http
-POST /api/connect
-POST /api/disconnect
-GET /api/status
-```
-
-#### 3. Data Operations
-```http
-POST /api/read
-POST /api/write
-POST /api/write_multiple
-```
-
-#### 4. Monitoring Control
-```http
-POST /api/start_monitoring
-POST /api/stop_monitoring
-```
-
-#### 5. Data Retrieval
-```http
-GET /api/data/latest
-GET /api/data/history?limit=100
-```
+For complete endpoint details with request/response schemas, see lines 313-358 or visit `/docs` endpoint.
 
 ## 🔐 Security Considerations
 
@@ -894,382 +852,11 @@ The Modbus Monitor is a production-ready, full-stack solution for industrial Mod
 
 ---
 
-## 📊 System Architecture Analysis
+## 📊 System Architecture & Workflows
 
-### Overall Architecture
+> **Note**: For detailed UML diagrams (Component, Sequence, Class, State), see [docs/UML.md](docs/UML.md)
 
-The Modbus Monitor system implements a three-tier architecture with clear separation of concerns:
-
-1. **Frontend Tier**: Vue 3 web application with modern UI components
-2. **Backend Tier**: FastAPI REST API with async Modbus service
-3. **Data Tier**: Redis for caching and time-series storage
-
-### Communication Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend as Frontend<br/>(Vue 3)
-    participant Backend as Backend API<br/>(FastAPI)
-    participant ModbusService as Modbus Service
-    participant Redis
-    participant Device as Modbus Device
-
-    Note over User,Device: Connection Phase
-
-    User->>Frontend: Configure Connection
-    Frontend->>Backend: POST /api/config
-    Backend-->>Frontend: Config Updated
-
-    User->>Frontend: Click Connect
-    Frontend->>Backend: POST /api/connect
-    Backend->>ModbusService: Establish Connection
-    ModbusService->>Device: TCP Connect (Port 502)
-    Device-->>ModbusService: Connection Accepted
-    ModbusService-->>Backend: Status: Connected
-    Backend-->>Frontend: 200 OK
-    Frontend-->>User: Show "Connected"
-
-    Note over User,Device: Monitoring Phase
-
-    User->>Frontend: Start Monitoring
-    Frontend->>Backend: POST /api/start_monitoring
-    Backend->>ModbusService: Start Monitoring Loop
-
-    loop Every Poll Interval
-        ModbusService->>Device: Read Registers
-        Device-->>ModbusService: Register Data
-        ModbusService->>Redis: Store Latest (JSON)
-        ModbusService->>Redis: Add to History (ZSET)
-        ModbusService-->>Backend: Data Update
-        Backend-->>Frontend: GET /api/data/latest
-        Frontend-->>User: Update Display
-    end
-
-    Note over User,Device: Manual Read Phase
-
-    User->>Frontend: Manual Read Request
-    Frontend->>Backend: POST /api/read
-    Backend->>ModbusService: Read Command
-    ModbusService->>Device: Read Request
-    Device-->>ModbusService: Register Values
-    ModbusService-->>Backend: Response Data
-    Backend-->>Frontend: JSON Response
-    Frontend-->>User: Display Results
-
-    Note over User,Device: Write Phase
-
-    User->>Frontend: Write Request
-    Frontend->>Backend: POST /api/write
-    Backend->>ModbusService: Write Command
-    ModbusService->>Device: Write Request (FC06/FC16)
-    Device-->>ModbusService: Write Ack
-    ModbusService-->>Backend: Success
-    Backend-->>Frontend: Operation Result
-    Frontend-->>User: Show Feedback
-```
-
-### Data Flow Architecture
-
-```mermaid
-flowchart TB
-    subgraph Frontend["Frontend Layer"]
-        VueApp["Vue 3 App<br/>(Configuration, ManualRead,<br/>WriteRegister, DataDisplay)"]
-        API["API Client<br/>(Axios)"]
-    end
-
-    subgraph Backend["Backend Layer"]
-        FastAPI["FastAPI Server<br/>(REST API)"]
-        Modbus["Modbus Service<br/>(Async Operations)"]
-    end
-
-    subgraph Data["Data Layer"]
-        RedisDB["Redis Database<br/>(Latest Cache +<br/>Time-Series History)"]
-    end
-
-    subgraph Device["Device Layer"]
-        TCPClient["Modbus TCP Client<br/>(pymodbus)"]
-        ModbusDevice["Modbus Device<br/>(PLC/Sensors)"]
-    end
-
-    VueApp -->|HTTP/REST| API
-    API -->|API Calls| FastAPI
-    FastAPI -->|Service Calls| Modbus
-    Modbus -->|Async Operations| TCPClient
-    TCPClient -->|TCP Connection<br/>Port 502| ModbusDevice
-    Modbus -->|Store/Retrieve Data| RedisDB
-    RedisDB -->|Data Queries| FastAPI
-
-    classDef frontendStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef backendStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef dataStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef deviceStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-
-    class VueApp,API frontendStyle
-    class FastAPI,Modbus backendStyle
-    class RedisDB dataStyle
-    class TCPClient,ModbusDevice deviceStyle
-```
-
-**Frontend Responsibilities:**
-- User Interface
-- Configuration Management
-- Real-time Data Display
-- User Input Validation
-
-**Modbus Service Features:**
-- Connection Management
-- Register Read/Write
-- Continuous Monitoring
-- Error Recovery
-
-**Redis Storage:**
-- modbus:latest (JSON)
-- modbus:history (Sorted Set)
-- Configurable retention (1000 entries)
-
-**Supported Modbus Operations:**
-- Holding Registers (FC03, FC06, FC16)
-- Input Registers (FC04)
-- Coils (FC01, FC05, FC15)
-- Discrete Inputs (FC02)
-
-### Sequence Diagram for Read Operation
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Backend as FastAPI
-    participant Service as ModbusService
-    participant Client as ModbusClient
-    participant Redis
-    participant Device
-
-    Note over User,Device: Initial Request
-
-    User->>Frontend: Click "Read Register"
-    Frontend->>Frontend: Validate Input
-    Frontend->>Backend: POST /api/read
-    Note right of Frontend: Request Payload:<br/>{<br/>"address": 0,<br/>"count": 10,<br/>"register_type": "holding"<br/>}
-
-    Backend->>Backend: Validate Request
-    Backend->>Service: read_holding_registers()
-    activate Service
-
-    Service->>Client: read_holding_registers()
-    activate Client
-
-    Client->>Device: Send Modbus Request
-    Device-->>Client: Return Register Values
-
-    Client-->>Service: Data Received
-    deactivate Client
-
-    Service->>Service: Process Data
-    Service->>Redis: Store in cache (latest)
-    Service->>Redis: Add to history
-    Service-->>Backend: Return Processed Data
-    deactivate Service
-
-    Backend->>Frontend: Return JSON Data
-    Note right of Backend: Response:<br/>{<br/>"success": true,<br/>"data": [...],<br/>"timestamp": "..."<br/>}
-
-    Frontend->>Frontend: Update Display
-    Frontend-->>User: Show Register Values
-    Frontend->>Frontend: Auto-refresh enabled?
-
-    Note over User,Device: Monitoring Loop
-
-    Frontend->>Backend: Poll /api/data/latest
-    Backend->>Redis: Get latest data
-    Redis-->>Backend: Return cached data
-    Backend-->>Frontend: Return JSON
-    Frontend->>Frontend: Update UI in real-time
-```
-
-### Class Diagram for Modbus Service
-
-```mermaid
-classDiagram
-    class ModbusConfig {
-        +str host
-        +int port
-        +int device_id
-        +float poll_interval
-        +float timeout
-        +int retries
-        +validate_connection() bool
-        +get_default_timeout() float
-    }
-
-    class AsyncModbusMonitor {
-        -ModbusTcpClient client
-        -ModbusConfig config
-        -bool running
-        -List~Dict~ registers
-        -int consecutive_errors
-        +connect() bool
-        +disconnect() None
-        +read_holding_registers() List~int~
-        +write_holding_register() bool
-        +monitor_continuously() None
-        +add_register() None
-        -_handle_error() None
-        -_reconnect() bool
-    }
-
-    class RegisterDefinition {
-        +int address
-        +int count
-        +str register_type
-        +str name
-        +str unit
-        +float scale
-        +validate() bool
-        +get_function_code() int
-    }
-
-    class ModbusData {
-        +datetime timestamp
-        +str register_name
-        +int address
-        +List~int~ values
-        +str register_type
-        +bool success
-        +str error
-        +to_dict() Dict
-        +to_redis_format() str
-    }
-
-    class RedisManager {
-        -str host
-        -int port
-        -int db
-        -Redis redis_client
-        +connect() bool
-        +store_latest(ModbusData) bool
-        +store_history(ModbusData) bool
-        +get_latest() Dict
-        +get_history(int) List~Dict~
-        +close() None
-    }
-
-    ModbusConfig "1" --* "1" AsyncModbusMonitor : uses
-    AsyncModbusMonitor "1" --* "*" RegisterDefinition : manages
-    AsyncModbusMonitor "1" --> "1" RedisManager : uses
-    ModbusData "1" --> "1" RegisterDefinition : based on
-    RedisManager "1" o-- "*" ModbusData : stores
-
-    note for AsyncModbusMonitor "Key Features:\n- Async operations (asyncio)\n- Auto reconnection\n- Error handling & retries\n- Concurrent register reading"
-    note for RegisterDefinition "Register Types:\n- holding (FC03, FC06, FC16)\n- input (FC04)\n- coils (FC01, FC05, FC15)\n- discrete (FC02)"
-    note for RedisManager "Redis Keys:\n- modbus:latest (JSON)\n- modbus:history (Sorted Set)"
-```
-
-### State Diagram for Connection Management
-
-```mermaid
-stateDiagram-v2
-    [*] --> Disconnected
-
-    Disconnected --> Connecting : connect()
-    Connecting --> Connected : Success
-    Connecting --> Error : Connection Failed
-    Connecting --> Disconnected : Cancel/Timeout
-
-    Connected --> Monitoring : start_monitoring()
-    Connected --> ManualRead : read_registers()
-    Connected --> ManualWrite : write_registers()
-    Connected --> Disconnecting : disconnect()
-
-    Monitoring --> Monitoring : Poll Cycle (Successful)
-    Monitoring --> Stopping : stop_monitoring()
-    Monitoring --> ManualRead : Interrupt (Read Request)
-    Monitoring --> ManualWrite : Interrupt (Write Request)
-    Monitoring --> Error : Connection Lost
-    Monitoring --> Connected : Pause Monitoring
-
-    ManualRead --> Connected : Operation Complete
-    ManualWrite --> Connected : Operation Complete
-    ManualRead --> Error : Read Failed
-    ManualWrite --> Error : Write Failed
-
-    Stopping --> Connected : Restart Monitoring
-    Stopping --> Disconnected : Stop Complete
-
-    Disconnecting --> Disconnected : Disconnect Complete
-    Disconnecting --> Error : Disconnect Failed
-
-    Error --> Connecting : Auto Retry - Limit 5
-    Error --> Disconnected : Max Retries Exceeded
-
-    note right of Monitoring
-        Monitoring Features:
-        - Continuous polling
-        - Redis data storage
-        - Auto error recovery
-        - Config update support
-    end note
-
-    note right of Error
-        Error Recovery:
-        - Configurable retry count
-        - Exponential backoff
-        - Graceful degradation
-        - User notifications
-    end note
-
-    note right of Connected
-        Ready State:
-        - Connected to device
-        - Accepting commands
-        - Idle or waiting
-    end note
-```
-
-## 🏗️ Detailed Architecture Analysis
-
-### 1. System Architecture Pattern
-
-The project follows a **Three-Tier Architecture** pattern:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                 Presentation Layer                       │
-│              Vue 3 + Vite Frontend                       │
-│    - Configuration Interface                           │
-│    - Real-time Data Display                             │
-│    - User Interaction Management                        │
-└────────────────────┬────────────────────────────────────┘
-                     │ HTTP/REST API (JSON)
-┌────────────────────▼────────────────────────────────────┐
-│                Business Logic Layer                       │
-│               FastAPI Backend Service                   │
-│    - API Endpoints Management                           │
-│    - Request Validation                                  │
-│    - Authentication & Authorization                    │
-│    - Business Logic Processing                          │
-└────────────────────┬────────────────────────────────────┘
-                     │ Internal Service Calls
-┌────────────────────▼────────────────────────────────────┐
-│                Data Access Layer                         │
-│             Modbus Service + Redis                       │
-│    - Modbus TCP Communication                           │
-│    - Data Persistence (Time-series)                      │
-│    - Caching Strategy                                    │
-│    - Error Handling & Recovery                          │
-└────────────────────┬────────────────────────────────────┘
-                     │ TCP/IP Protocol
-┌────────────────────▼────────────────────────────────────┐
-│                External Systems                          │
-│            Modbus TCP Devices                           │
-│    - PLCs                                                │
-│    - Sensors                                             │
-│    - Industrial Controllers                              │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 2. Technical Specifications
+### Technical Specifications
 
 #### Communication Protocol Stack
 
@@ -1323,289 +910,52 @@ The project follows a **Three-Tier Architecture** pattern:
 | Write Multiple Coils | 15 | Write multiple coils | ✅ |
 | Read Discrete Inputs | 02 | Read digital inputs | ✅ |
 
-### 3. Workflow Analysis
+### Workflow Summaries
 
-#### Configuration Workflow
+**Configuration Flow:**
+1. User opens panel → Load existing config or defaults
+2. Validate parameters (Pydantic) → POST /api/config
+3. Backend updates config → Store in Redis → UI feedback
 
-```mermaid
-flowchart TD
-    Start([Start]) --> OpenPanel[User opens Configuration Panel]
+**Monitoring Flow:**
+1. Start monitoring → Initialize asyncio tasks
+2. Loop: Read registers (asyncio.gather) → Store in Redis (JSON + Sorted Set)
+3. Error handling: Max 5 consecutive errors → Auto-reconnect with exponential backoff
+4. Stop: Clean up resources and close connections
 
-    OpenPanel --> CheckConfig{Existing config?}
+**Error Recovery:**
+- **Connection errors**: Retry with backoff (1s → 30s max), stop after 5 failures
+- **Read/Write errors**: Log, notify user, continue with other operations
+- **Backoff strategy**: 2x multiplier with ±10% jitter
 
-    CheckConfig -->|Yes| DisplayConfig[Display current configuration]
-    DisplayConfig --> ModifyParams[User modifies parameters]
-    ModifyParams --> Validate
+> **Detailed flowcharts** available in [docs/UML.md](docs/UML.md)
 
-    CheckConfig -->|No| LoadDefaults[Load default values from .env]
-    LoadDefaults --> EnterParams[User enters parameters]
-    EnterParams --> Validate
+### Industry Applications
 
-    Validate[Validate input parameters] --> IsValid{Valid?}
+| Sector | Use Cases |
+|--------|-----------|
+| **Industrial Automation** | PLC monitoring, sensor data collection, process control, predictive maintenance |
+| **Building Management** | HVAC/lighting control, energy monitoring, security systems |
+| **Manufacturing** | Production line monitoring, quality control, inventory/equipment tracking |
+| **Agriculture** | Greenhouse control, irrigation systems, livestock environmental monitoring |
 
-    IsValid -->|Yes| UpdateObj[Update Configuration object]
-    UpdateObj --> SendAPI[Send POST /api/config]
-    SendAPI --> BackendUpdate[Backend updates config]
-    BackendUpdate --> StoreRedis[Store in Redis cache]
-    StoreRedis --> ReturnSuccess[Return success response]
-    ReturnSuccess --> UpdateUI
+### Key Technical Solutions
 
-    IsValid -->|No| ShowErrors[Show validation errors]
-    ShowErrors --> Highlight[Highlight invalid fields]
-    Highlight --> WaitCorrection[Wait for user correction]
-    WaitCorrection --> Validate
+| Challenge | Solution |
+|-----------|----------|
+| **Real-time Performance** | Async I/O, concurrent reads (asyncio.gather), Redis caching |
+| **Reliability** | Auto-reconnect with backoff, retry mechanisms, validation |
+| **Scalability** | Async design, Redis storage, configurable retention |
+| **Security** | Network isolation, CORS, HTTPS, Pydantic validation |
+| **Integration** | Complete Modbus support, flexible config, multiple interfaces |
 
-    UpdateUI[Update UI with new config] --> ShowNotif[Show success notification]
-    ShowNotif --> Stop([Stop])
+### Innovation Highlights
 
-    style Start fill:#00cc66
-    style Stop fill:#cc0000
-    style IsValid fill:#fff3e0
-    style CheckConfig fill:#fff3e0
-```
-
-**Editable Parameters:**
-- Modbus Host, Port, Device ID
-- Poll Interval, Timeout
-- Register Ranges
-
-**API Request:** Validated by Pydantic
-
-#### Monitoring Workflow
-
-```mermaid
-flowchart TD
-    Start([Start]) --> ClickStart[User clicks Start Monitoring]
-    ClickStart --> InitLoop[Initialize monitoring loop]
-    InitLoop --> SetupRegs[Set up register list from config]
-    SetupRegs --> StartTasks[Start asyncio tasks]
-
-    StartTasks --> CheckConn{Connected?}
-
-    CheckConn -->|Yes| ReadRegs[Read all configured registers]
-    ReadRegs --> ReadSuccess{Read success?}
-
-    ReadSuccess -->|Yes| ProcessData[Process register data]
-    ProcessData --> ApplyScale[Apply scaling/conversion]
-    ApplyScale --> StoreLatest[Store in Redis latest]
-    StoreLatest --> StoreHistory[Add to Redis history]
-    StoreHistory --> UpdateUI[Update UI via API]
-    UpdateUI --> Wait[Wait for poll interval]
-    Wait --> MonitorActive
-
-    ReadSuccess -->|No| HandleError[Handle read error]
-    HandleError --> IncError[Increment error counter]
-    IncError --> MaxErrors{Max errors<br/>reached?}
-    MaxErrors -->|Yes| Reconnect[Attempt reconnection]
-    MaxErrors -->|No| Continue[Continue monitoring]
-    Reconnect --> MonitorActive
-    Continue --> MonitorActive
-
-    CheckConn -->|No| AttemptConn[Attempt connection]
-    AttemptConn --> ConnSuccess{Success?}
-    ConnSuccess -->|Yes| ResetError[Reset error counter]
-    ConnSuccess -->|No| Backoff[Wait with exponential backoff]
-    ResetError --> MonitorActive
-    Backoff --> MonitorActive
-
-    MonitorActive{Monitoring<br/>active?}
-    MonitorActive -->|Yes| CheckConn
-    MonitorActive -->|No| StopLoop[Stop monitoring loop]
-
-    StopLoop --> CloseConn[Close Modbus connection]
-    CloseConn --> Cleanup[Clean up resources]
-    Cleanup --> Stop([Stop])
-
-    style Start fill:#00cc66
-    style Stop fill:#cc0000
-    style CheckConn fill:#fff3e0
-    style ReadSuccess fill:#fff3e0
-    style MaxErrors fill:#fff3e0
-    style ConnSuccess fill:#fff3e0
-    style MonitorActive fill:#fff3e0
-```
-
-**Concurrent Reading:** asyncio.gather()
-
-**Redis Storage:**
-- Latest: JSON
-- History: Sorted Set
-- Retention: 1000 entries
-
-#### Error Recovery Workflow
-
-```mermaid
-flowchart TD
-    Start([Start]) --> ErrorDetect[Error detected]
-    ErrorDetect --> DetermineType[Determine error type]
-
-    DetermineType --> ErrorType{Error Type?}
-
-    ErrorType -->|Connection Error| CloseConn[Close Modbus connection]
-    CloseConn --> IncErrors[Increment consecutive_errors]
-    IncErrors --> CheckMax{Max errors >= 5?}
-
-    CheckMax -->|Yes| LogCritical[Log critical error]
-    LogCritical --> NotifyUser1[Notify user]
-    NotifyUser1 --> StopMon[Stop monitoring]
-    StopMon --> Stop1([Stop])
-
-    CheckMax -->|No| CalcBackoff[Calculate exponential backoff]
-    CalcBackoff --> WaitBackoff[Wait for backoff period]
-    WaitBackoff --> AttemptReconn[Attempt reconnection]
-    AttemptReconn --> ReconnSuccess{Success?}
-
-    ReconnSuccess -->|Yes| ResetCounter[Reset error counter]
-    ResetCounter --> Resume[Resume monitoring]
-    Resume --> Complete
-
-    ReconnSuccess -->|No| Retry[Retry connection attempt]
-    Retry --> Complete
-
-    ErrorType -->|Read Error| LogRead[Log read error]
-    LogRead --> MarkFailed[Mark specific register failed]
-    MarkFailed --> ContinueRegs[Continue with other registers]
-    ContinueRegs --> UpdateUIRead[Update UI with error status]
-    UpdateUIRead --> Complete
-
-    ErrorType -->|Write Error| LogWrite[Log write error]
-    LogWrite --> NotifyWrite[Notify user of failure]
-    NotifyWrite --> UpdateUIWrite[Update UI with error message]
-    UpdateUIWrite --> ContinueNormal[Continue normal operation]
-    ContinueNormal --> Complete
-
-    ErrorType -->|Other errors| LogGeneric[Log generic error]
-    LogGeneric --> NotifyIfNeeded[Notify user if needed]
-    NotifyIfNeeded --> ContinueOp[Continue operation]
-    ContinueOp --> Complete
-
-    Complete[Error recovery complete] --> Stop2([Stop])
-
-    style Start fill:#00cc66
-    style Stop1 fill:#cc0000
-    style Stop2 fill:#cc0000
-    style ErrorType fill:#fff3e0
-    style CheckMax fill:#ffebee
-    style ReconnSuccess fill:#fff3e0
-```
-
-**Error Types:**
-- Connection Timeout
-- Network Unreachable
-- Modbus Exception
-- Device Busy
-- Invalid Response
-- Redis Connection
-
-**Backoff Strategy:**
-- Initial: 1s
-- Multiplier: 2x
-- Max: 30s
-- Jitter: ±10%
-
-### 4. Industry Applications and Use Cases
-
-#### Industrial Automation
-- **PLC Monitoring**: Real-time monitoring of Programmable Logic Controllers
-- **Sensor Data Collection**: Temperature, pressure, flow rate sensors
-- **Process Control**: Automated control systems with feedback loops
-- **Predictive Maintenance**: Monitor equipment health metrics
-
-#### Building Management
-- **HVAC Systems**: Climate control and energy monitoring
-- **Lighting Control**: Automated lighting systems
-- **Energy Management**: Power consumption monitoring
-- **Security Systems**: Access control and alarm monitoring
-
-#### Manufacturing
-- **Production Lines**: Machine status and output monitoring
-- **Quality Control**: Process parameter tracking
-- **Inventory Management**: Material level monitoring
-- **Equipment Monitoring**: Machine health and performance
-
-#### Agricultural
-- **Greenhouse Control**: Temperature, humidity, CO2 monitoring
-- **Irrigation Systems**: Soil moisture and flow control
-- **Livestock Monitoring**: Environmental conditions tracking
-
-### 5. Technical Challenges and Solutions
-
-#### Challenge 1: Real-time Performance
-**Problem**: Industrial applications require sub-second response times
-**Solution**:
-- Async/await architecture for non-blocking I/O
-- Concurrent register reading with `asyncio.gather()`
-- Redis caching for fast data retrieval
-- Optimized polling intervals
-
-#### Challenge 2: Reliability
-**Problem**: Industrial environments have unstable networks
-**Solution**:
-- Automatic reconnection with exponential backoff
-- Configurable retry mechanisms
-- Graceful error handling
-- Data validation and verification
-
-#### Challenge 3: Scalability
-**Problem**: Multiple devices and high data volumes
-**Solution**:
-- Asynchronous design handles concurrent connections
-- Redis for high-performance data storage
-- Configurable data retention policies
-- Load balancing ready architecture
-
-#### Challenge 4: Security
-**Problem**: Industrial systems are critical infrastructure
-**Solution**:
-- Network isolation recommendations
-- CORS configuration
-- HTTPS support
-- Input validation with Pydantic
-
-#### Challenge 5: Integration
-**Problem**: Legacy industrial protocols
-**Solution**:
-- Complete Modbus TCP support
-- Flexible configuration system
-- Multiple interface options (CLI, API, Web)
-- Standard data formats
-
-### 6. Contribution and Innovation Points
-
-#### Technical Contributions
-1. **Modern Async Architecture**: First async/await implementation for industrial monitoring
-2. **Comprehensive Error Handling**: Robust fault tolerance for industrial environments
-3. **Flexible Configuration**: Pydantic-based configuration management
-4. **Real-time Data Processing**: Redis integration for time-series data
-5. **Modern UI**: Vue 3 + Vite for industrial web interfaces
-
-#### Community Contributions
-1. **Open Source**: Complete implementation available for learning
-2. **Documentation**: Comprehensive guides and examples
-3. **Docker Support**: Easy deployment for development
-4. **Testing Framework**: Simulators for development without hardware
-
-#### Innovation Points
-1. **Unified Interface**: Single system for multiple use cases
-2. **Developer Experience**: Modern tooling and workflow
-3. **Production Ready**: Containerized deployment with monitoring
-4. **Extensible Design**: Easy to add new features and protocols
-
-### 7. Future Development Opportunities
-
-#### Near-term Enhancements
-- WebSocket support for real-time updates
-- User authentication and authorization
-- Database integration (PostgreSQL, TimescaleDB)
-- Mobile-responsive design
-- Advanced data visualization
-
-#### Long-term Features
-- Multiple protocol support (OPC-UA, BACnet)
-- Edge computing capabilities
-- Machine learning integration
-- Cloud deployment options
-- Advanced analytics dashboards
+- **First async/await** implementation for industrial monitoring
+- **Pydantic-based** configuration with validation
+- **Redis time-series** integration for historical data
+- **Modern stack** (Vue 3 + Vite + FastAPI) for industrial applications
+- **Production-ready** Docker deployment with comprehensive documentation
 
 ---
 
